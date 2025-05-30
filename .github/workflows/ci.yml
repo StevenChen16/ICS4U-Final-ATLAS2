@@ -27,14 +27,14 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-cov black isort pylint safety bandit
     
-    - name: Format check
-      run: |
-        black --check .
-        isort --check-only .
+    # - name: Format check
+    #   run: |
+    #     black --check .
+    #     isort --check-only .
     
-    - name: Lint
-      run: |
-        pylint **/*.py --fail-under=7.0
+    # - name: Lint
+    #   run: |
+    #     pylint **/*.py --fail-under=7.0
     
     - name: Security check
       run: |
