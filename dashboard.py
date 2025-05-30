@@ -3,20 +3,21 @@ ATLAS - Stock Analysis Dashboard
 Author: Steven Chen
 """
 
-import dash
-from dash import dcc, html, Input, Output, State
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import plotly.express as px
-import pandas as pd
-import numpy as np
-import yfinance as yf
-from datetime import datetime, timedelta
-import dash_bootstrap_components as dbc
-from dash.exceptions import PreventUpdate
-import warnings
-import time
 import json
+import time
+import warnings
+from datetime import datetime, timedelta
+
+import dash
+import dash_bootstrap_components as dbc
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import yfinance as yf
+from dash import Input, Output, State, dcc, html
+from dash.exceptions import PreventUpdate
+from plotly.subplots import make_subplots
 
 warnings.filterwarnings("ignore")
 

@@ -1,9 +1,11 @@
 dash
 torch
+torchvision
+scikit-learn
+scikit-image
 yfinance
 dash-bootstrap-components
 pyts
 matplotlib
 seaborn
-scikit-image
 tqdm

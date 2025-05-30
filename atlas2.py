@@ -4,31 +4,35 @@
 # Binary Classification Version - Only distinguishes up and down
 # ----------------------------------------
 
+import os
+import warnings
+
+import joblib
+# matplotlib font configuration
+import matplotlib as mpl
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import os
+import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc, precision_recall_curve, average_precision_score
-from pyts.image import GramianAngularField, MarkovTransitionField, RecurrencePlot
+from pyts.image import (GramianAngularField, MarkovTransitionField,
+                        RecurrencePlot)
 from skimage.transform import resize
-import matplotlib.gridspec as gridspec
-import warnings
+from sklearn.metrics import (auc, average_precision_score,
+                             classification_report, confusion_matrix,
+                             precision_recall_curve, roc_curve)
+from sklearn.preprocessing import LabelEncoder
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
-import seaborn as sns
-import joblib
 
 # Import user-provided data processing module
 import data  # User-provided data processing module
 
-# matplotlib font configuration
-import matplotlib as mpl
-mpl.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'sans-serif']
-mpl.rcParams['axes.unicode_minus'] = False
+mpl.rcParams["font.sans-serif"] = ["DejaVu Sans", "Arial", "sans-serif"]
+mpl.rcParams["axes.unicode_minus"] = False
 
 # Set random seed
 np.random.seed(42)
@@ -41,14 +45,14 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Ignore warnings
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 # ----------------------------------------
 # Part 1: Data Loading and Preprocessing
 # ----------------------------------------
 
 
-def load_ticker_data(ticker, data_dir='data_short', start_idx=None, end_idx=None):
+def load_ticker_data(ticker, data_dir="data_short", start_idx=None, end_idx=None):
     """
     Load preprocessed data for a single stock
 
@@ -60,10 +64,9 @@ def load_ticker_data(ticker, data_dir='data_short', start_idx=None, end_idx=None
     Returns:
     pd.DataFrame: Processed stock data
     """
-    file_path = os.path.join(data_dir, f'{ticker}.csv')
+    file_path = os.path.join(data_dir, f"{ticker}.csv")
     if not os.path.exists(file_path):
-        raise FileNotFoundError(
-            f"Cannot find data file for {ticker}: {file_path}")
+        raise FileNotFoundError(f"Cannot find data file for {ticker}: {file_path}")
 
     df = data.load_data_from_csv(file_path)
 
@@ -87,7 +90,7 @@ def create_binary_labels(df, window_size=50, threshold=0.5):
     list: Binary labels ('up' or 'down')
     """
     # Calculate price change percentage for future window_size days
-    future_returns = df['Close'].pct_change(window_size).shift(-window_size)
+    future_returns = df["Close"].pct_change(window_size).shift(-window_size)
 
     # Generate binary labels
     labels = []
@@ -96,16 +99,16 @@ def create_binary_labels(df, window_size=50, threshold=0.5):
         pct_change = future_returns.iloc[i]
 
         if pct_change > threshold:
-            labels.append('up')
+            labels.append("up")
         elif pct_change < -threshold:
-            labels.append('down')
+            labels.append("down")
         else:
             # If change is not large enough, we still classify by direction
             # But could also choose to ignore these samples
             if pct_change >= 0:
-                labels.append('up')
+                labels.append("up")
             else:
-                labels.append('down')
+                labels.append("down")
 
     return labels
 
@@ -137,7 +140,7 @@ def extract_windows_with_stride(df, window_size=50, stride=10, features=None):
     # Extract windows using stride
     for i in range(0, len(df) - window_size, stride):
         if i + window_size <= len(df) and i < len(labels):
-            window = df.iloc[i:i+window_size][features].values
+            window = df.iloc[i : i + window_size][features].values
             windows.append(window)
             window_labels.append(labels[i])
             indices.append(i)  # Record window start index
@@ -161,11 +164,11 @@ def transform_3d_to_images(windows, image_size=50):
     # Ensure image_size doesn't exceed time series length
     actual_image_size = min(image_size, n_timesteps)
     print(
-        f"Actual image size used: {actual_image_size} (original window length: {n_timesteps})")
+        f"Actual image size used: {actual_image_size} (original window length: {n_timesteps})"
+    )
 
     # Initialize output array - 4 types of image representations
-    transformed_images = np.zeros(
-        (n_samples, actual_image_size, actual_image_size, 4))
+    transformed_images = np.zeros((n_samples, actual_image_size, actual_image_size, 4))
 
     # Use the first feature of time series (usually closing price) as main conversion basis
     # Transform each sample
@@ -174,28 +177,26 @@ def transform_3d_to_images(windows, image_size=50):
         ts_reshaped = ts.reshape(1, -1)
 
         # 1. Gramian Angular Summation Field (GASF)
-        gasf = GramianAngularField(
-            image_size=actual_image_size, method='summation')
+        gasf = GramianAngularField(image_size=actual_image_size, method="summation")
         transformed_images[i, :, :, 0] = gasf.fit_transform(ts_reshaped)[0]
 
         # 2. Gramian Angular Difference Field (GADF)
-        gadf = GramianAngularField(
-            image_size=actual_image_size, method='difference')
+        gadf = GramianAngularField(image_size=actual_image_size, method="difference")
         transformed_images[i, :, :, 1] = gadf.fit_transform(ts_reshaped)[0]
 
         # 3. Recurrence Plot - use combination of all features
         # Create a synthetic feature using weighted combination of multiple features
         feature_weights = np.ones(n_features) / n_features  # simple average
-        weighted_ts = np.sum(
-            windows[i] * feature_weights.reshape(1, -1), axis=1)
+        weighted_ts = np.sum(windows[i] * feature_weights.reshape(1, -1), axis=1)
         weighted_ts_reshaped = weighted_ts.reshape(1, -1)
 
-        rp = RecurrencePlot(threshold='point', percentage=20)
+        rp = RecurrencePlot(threshold="point", percentage=20)
         rp_image = rp.fit_transform(weighted_ts_reshaped)[0]
 
         if rp_image.shape[0] != actual_image_size:
-            rp_image = resize(rp_image, (actual_image_size,
-                              actual_image_size), anti_aliasing=True)
+            rp_image = resize(
+                rp_image, (actual_image_size, actual_image_size), anti_aliasing=True
+            )
         transformed_images[i, :, :, 2] = rp_image
 
         # 4. Markov Transition Field
@@ -203,6 +204,7 @@ def transform_3d_to_images(windows, image_size=50):
         transformed_images[i, :, :, 3] = mtf.fit_transform(ts_reshaped)[0]
 
     return transformed_images
+
 
 # ----------------------------------------
 # Part 2: Time Series Splitting
@@ -224,15 +226,15 @@ def time_series_split(data, window_indices, labels, test_size=0.2, gap_size=20):
     tuple: (X_train, X_test, y_train, y_test, train_indices, test_indices)
     """
     # Check input data consistency
-    assert len(data) == len(window_indices) == len(
-        labels), "Input data, indices and labels must have consistent length"
+    assert (
+        len(data) == len(window_indices) == len(labels)
+    ), "Input data, indices and labels must have consistent length"
 
     # Get time index range
     min_idx = min(window_indices)
     max_idx = max(window_indices)
     total_range = max_idx - min_idx
-    print(
-        f"Time index range: {min_idx} to {max_idx} (total range: {total_range})")
+    print(f"Time index range: {min_idx} to {max_idx} (total range: {total_range})")
 
     # Calculate split point by time range
     split_time = min_idx + int((1 - test_size) * total_range)
@@ -255,21 +257,26 @@ def time_series_split(data, window_indices, labels, test_size=0.2, gap_size=20):
 
     # Print split results
     print(
-        f"Training set size: {len(X_train)} samples, Test set size: {len(X_test)} samples")
-    print(f"Training set time range: {min(train_indices) if len(train_indices) > 0 else 'N/A'} to "
-          f"{max(train_indices) if len(train_indices) > 0 else 'N/A'}")
-    print(f"Test set time range: {min(test_indices) if len(test_indices) > 0 else 'N/A'} to "
-          f"{max(test_indices) if len(test_indices) > 0 else 'N/A'}")
+        f"Training set size: {len(X_train)} samples, Test set size: {len(X_test)} samples"
+    )
     print(
-        f"Train/test gap size: {min(test_indices) - max(train_indices) if len(train_indices) > 0 and len(test_indices) > 0 else 'N/A'} index positions")
+        f"Training set time range: {min(train_indices) if len(train_indices) > 0 else 'N/A'} to "
+        f"{max(train_indices) if len(train_indices) > 0 else 'N/A'}"
+    )
+    print(
+        f"Test set time range: {min(test_indices) if len(test_indices) > 0 else 'N/A'} to "
+        f"{max(test_indices) if len(test_indices) > 0 else 'N/A'}"
+    )
+    print(
+        f"Train/test gap size: {min(test_indices) - max(train_indices) if len(train_indices) > 0 and len(test_indices) > 0 else 'N/A'} index positions"
+    )
 
     # Verify split ratio
     total_samples = len(data)
     train_ratio = len(X_train) / total_samples if total_samples > 0 else 0
     test_ratio = len(X_test) / total_samples if total_samples > 0 else 0
     print(f"\nSplit ratio check:")
-    print(
-        f"Training ratio: {train_ratio:.2%} (expected: {(1 - test_size):.2%})")
+    print(f"Training ratio: {train_ratio:.2%} (expected: {(1 - test_size):.2%})")
     print(f"Test ratio: {test_ratio:.2%} (expected: {test_size:.2%})")
 
     # Print class distribution
@@ -287,9 +294,12 @@ def time_series_split(data, window_indices, labels, test_size=0.2, gap_size=20):
     # Warning: if split ratio deviation is too large
     expected_train_ratio = 1 - test_size
     if abs(train_ratio - expected_train_ratio) > 0.05:  # allow 5% deviation
-        print("\nWarning: Training set ratio deviates significantly from expected, may need to check data distribution or adjust split logic!")
+        print(
+            "\nWarning: Training set ratio deviates significantly from expected, may need to check data distribution or adjust split logic!"
+        )
 
     return X_train, X_test, y_train, y_test, train_indices, test_indices
+
 
 # ----------------------------------------
 # Part 3: Specialized Financial Convolution Kernels
@@ -304,211 +314,247 @@ def create_specialized_kernels():
     dict: Specialized convolution kernels categorized by image type
     """
     # 1. Trend convolution kernels - enhanced detection capability
-    uptrend_kernel = np.array([
-        [-2.0, -1.5, -1.0,  0.0,  2.0],
-        [-1.5, -1.0,  0.0,  1.5,  3.0],
-        [-1.0,  0.0,  2.0,  3.5,  4.0],
-        [0.0,  1.5,  3.5,  4.5,  5.0],
-        [2.0,  3.0,  4.0,  5.0,  6.0]
-    ])
+    uptrend_kernel = np.array(
+        [
+            [-2.0, -1.5, -1.0, 0.0, 2.0],
+            [-1.5, -1.0, 0.0, 1.5, 3.0],
+            [-1.0, 0.0, 2.0, 3.5, 4.0],
+            [0.0, 1.5, 3.5, 4.5, 5.0],
+            [2.0, 3.0, 4.0, 5.0, 6.0],
+        ]
+    )
 
-    downtrend_kernel = np.array([
-        [6.0,  5.0,  4.0,  3.0,  2.0],
-        [5.0,  4.5,  3.5,  1.5,  0.0],
-        [4.0,  3.5,  2.0,  0.0, -1.0],
-        [3.0,  1.5,  0.0, -1.0, -1.5],
-        [2.0,  0.0, -1.0, -1.5, -2.0]
-    ])
+    downtrend_kernel = np.array(
+        [
+            [6.0, 5.0, 4.0, 3.0, 2.0],
+            [5.0, 4.5, 3.5, 1.5, 0.0],
+            [4.0, 3.5, 2.0, 0.0, -1.0],
+            [3.0, 1.5, 0.0, -1.0, -1.5],
+            [2.0, 0.0, -1.0, -1.5, -2.0],
+        ]
+    )
 
     # 2. Support/resistance level detection kernel - enhanced weight contrast
-    level_kernel = np.array([
-        [-1.5, -1.5, -1.5, -1.5, -1.5],
-        [-1.0, -1.0, -1.0, -1.0, -1.0],
-        [3.0,  3.0,  3.0,  3.0,  3.0],
-        [-1.0, -1.0, -1.0, -1.0, -1.0],
-        [-1.5, -1.5, -1.5, -1.5, -1.5]
-    ])
+    level_kernel = np.array(
+        [
+            [-1.5, -1.5, -1.5, -1.5, -1.5],
+            [-1.0, -1.0, -1.0, -1.0, -1.0],
+            [3.0, 3.0, 3.0, 3.0, 3.0],
+            [-1.0, -1.0, -1.0, -1.0, -1.0],
+            [-1.5, -1.5, -1.5, -1.5, -1.5],
+        ]
+    )
 
     # 3. Reversal pattern convolution kernels - more precise feature extraction
-    head_shoulders_top_kernel = np.array([
-        [0.8,  1.0,  0.2,  1.0,  0.8],
-        [0.5,  0.7, -0.2,  0.7,  0.5],
-        [0.0,  0.0, -1.5,  0.0,  0.0],
-        [-0.7, -0.7, -1.0, -0.7, -0.7],
-        [-1.0, -1.0, -1.0, -1.0, -1.0]
-    ])
+    head_shoulders_top_kernel = np.array(
+        [
+            [0.8, 1.0, 0.2, 1.0, 0.8],
+            [0.5, 0.7, -0.2, 0.7, 0.5],
+            [0.0, 0.0, -1.5, 0.0, 0.0],
+            [-0.7, -0.7, -1.0, -0.7, -0.7],
+            [-1.0, -1.0, -1.0, -1.0, -1.0],
+        ]
+    )
 
-    head_shoulders_bottom_kernel = np.array([
-        [-1.0, -1.0, -1.0, -1.0, -1.0],
-        [-0.7, -0.7, -1.0, -0.7, -0.7],
-        [0.0,  0.0, -1.5,  0.0,  0.0],
-        [0.5,  0.7, -0.2,  0.7,  0.5],
-        [0.8,  1.0,  0.2,  1.0,  0.8]
-    ])
+    head_shoulders_bottom_kernel = np.array(
+        [
+            [-1.0, -1.0, -1.0, -1.0, -1.0],
+            [-0.7, -0.7, -1.0, -0.7, -0.7],
+            [0.0, 0.0, -1.5, 0.0, 0.0],
+            [0.5, 0.7, -0.2, 0.7, 0.5],
+            [0.8, 1.0, 0.2, 1.0, 0.8],
+        ]
+    )
 
-    double_top_kernel = np.array([
-        [0.0,  1.0, -0.2,  1.0,  0.0],
-        [0.0,  0.7, -0.5,  0.7,  0.0],
-        [0.0,  0.0, -1.0,  0.0,  0.0],
-        [-0.5, -0.5, -0.7, -0.5, -0.5],
-        [-0.8, -0.8, -0.8, -0.8, -0.8]
-    ])
+    double_top_kernel = np.array(
+        [
+            [0.0, 1.0, -0.2, 1.0, 0.0],
+            [0.0, 0.7, -0.5, 0.7, 0.0],
+            [0.0, 0.0, -1.0, 0.0, 0.0],
+            [-0.5, -0.5, -0.7, -0.5, -0.5],
+            [-0.8, -0.8, -0.8, -0.8, -0.8],
+        ]
+    )
 
-    double_bottom_kernel = np.array([
-        [-0.8, -0.8, -0.8, -0.8, -0.8],
-        [-0.5, -0.5, -0.7, -0.5, -0.5],
-        [0.0,  0.0, -1.0,  0.0,  0.0],
-        [0.0,  0.7, -0.5,  0.7,  0.0],
-        [0.0,  1.0, -0.2,  1.0,  0.0]
-    ])
+    double_bottom_kernel = np.array(
+        [
+            [-0.8, -0.8, -0.8, -0.8, -0.8],
+            [-0.5, -0.5, -0.7, -0.5, -0.5],
+            [0.0, 0.0, -1.0, 0.0, 0.0],
+            [0.0, 0.7, -0.5, 0.7, 0.0],
+            [0.0, 1.0, -0.2, 1.0, 0.0],
+        ]
+    )
 
     # 4. Enhanced uptrend pattern convolution kernels
-    v_bottom_kernel = np.array([
-        [-1.5, -1.5, -1.5, -1.5, -1.5],
-        [-1.0, -1.2, -1.4, -1.2, -1.0],
-        [-0.2, -0.5, -1.0, -0.5, -0.2],
-        [0.7,  0.5,  0.0,  0.5,  0.7],
-        [1.5,  1.0,  0.5,  1.0,  1.5]
-    ])
+    v_bottom_kernel = np.array(
+        [
+            [-1.5, -1.5, -1.5, -1.5, -1.5],
+            [-1.0, -1.2, -1.4, -1.2, -1.0],
+            [-0.2, -0.5, -1.0, -0.5, -0.2],
+            [0.7, 0.5, 0.0, 0.5, 0.7],
+            [1.5, 1.0, 0.5, 1.0, 1.5],
+        ]
+    )
 
     # Emphasize price bounce
-    bounce_kernel = np.array([
-        [-2.0, -2.0, -2.0, -2.0, -2.0],
-        [-1.5, -1.5, -1.5, -1.5, -1.5],
-        [-0.5, -0.5, -0.5, -0.5, -0.5],
-        [1.0,  1.0,  1.0,  1.0,  1.0],
-        [2.0,  2.0,  2.0,  2.0,  2.0]
-    ])
+    bounce_kernel = np.array(
+        [
+            [-2.0, -2.0, -2.0, -2.0, -2.0],
+            [-1.5, -1.5, -1.5, -1.5, -1.5],
+            [-0.5, -0.5, -0.5, -0.5, -0.5],
+            [1.0, 1.0, 1.0, 1.0, 1.0],
+            [2.0, 2.0, 2.0, 2.0, 2.0],
+        ]
+    )
 
     # 5. Trend change detection kernel - enhanced turning point detection
-    trend_change_kernel = np.array([
-        [2.5,  1.5,  0.0, -1.5, -2.5],
-        [1.5,  2.5,  1.0, -0.5, -1.5],
-        [0.0,  1.0,  0.0,  1.0,  0.0],
-        [-1.5, -0.5,  1.0,  2.5,  1.5],
-        [-2.5, -1.5,  0.0,  1.5,  2.5]
-    ])
+    trend_change_kernel = np.array(
+        [
+            [2.5, 1.5, 0.0, -1.5, -2.5],
+            [1.5, 2.5, 1.0, -0.5, -1.5],
+            [0.0, 1.0, 0.0, 1.0, 0.0],
+            [-1.5, -0.5, 1.0, 2.5, 1.5],
+            [-2.5, -1.5, 0.0, 1.5, 2.5],
+        ]
+    )
 
     # 6. Continuation pattern kernels - enhanced uptrend patterns
-    symmetric_triangle_kernel = np.array([
-        [1.2,  0.6,  0.0, -0.6, -1.2],
-        [0.6,  0.6,  0.0, -0.6, -0.6],
-        [0.0,  0.0,  0.0,  0.0,  0.0],
-        [-0.6, -0.6,  0.0,  0.6,  0.6],
-        [-1.2, -0.6,  0.0,  0.6,  1.2]
-    ])
+    symmetric_triangle_kernel = np.array(
+        [
+            [1.2, 0.6, 0.0, -0.6, -1.2],
+            [0.6, 0.6, 0.0, -0.6, -0.6],
+            [0.0, 0.0, 0.0, 0.0, 0.0],
+            [-0.6, -0.6, 0.0, 0.6, 0.6],
+            [-1.2, -0.6, 0.0, 0.6, 1.2],
+        ]
+    )
 
     # Enhanced ascending triangle detection capability
-    ascending_triangle_kernel = np.array([
-        [0.0,  0.0,  0.0,  0.0,  0.0],
-        [0.2,  0.3,  0.4,  0.5,  0.6],
-        [0.3,  0.5,  0.7,  0.9,  1.1],
-        [-0.5, -0.4, -0.3, -0.2, -0.1],
-        [-1.2, -1.0, -0.8, -0.6, -0.4]
-    ])
+    ascending_triangle_kernel = np.array(
+        [
+            [0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.2, 0.3, 0.4, 0.5, 0.6],
+            [0.3, 0.5, 0.7, 0.9, 1.1],
+            [-0.5, -0.4, -0.3, -0.2, -0.1],
+            [-1.2, -1.0, -0.8, -0.6, -0.4],
+        ]
+    )
 
     # 7. Upward breakout signals
-    breakout_up_kernel = np.array([
-        [-1.5, -1.5, -1.5, -1.5, -1.5],
-        [-1.0, -1.0, -1.0, -1.0, -1.0],
-        [-0.5, -0.5, -0.5, -0.5, -0.5],
-        [1.0,  1.0,  1.0,  1.0,  1.0],
-        [2.0,  2.0,  2.0,  2.0,  2.0]
-    ])
+    breakout_up_kernel = np.array(
+        [
+            [-1.5, -1.5, -1.5, -1.5, -1.5],
+            [-1.0, -1.0, -1.0, -1.0, -1.0],
+            [-0.5, -0.5, -0.5, -0.5, -0.5],
+            [1.0, 1.0, 1.0, 1.0, 1.0],
+            [2.0, 2.0, 2.0, 2.0, 2.0],
+        ]
+    )
 
     # 8. Special pattern detection - cup and handle pattern (bullish signal)
-    cup_handle_kernel = np.array([
-        [0.0,  0.0,  0.0,  0.0, -0.5],
-        [0.3,  0.0, -0.3, -0.3, -0.2],
-        [0.7,  0.0, -0.7,  0.0,  0.0],
-        [1.0,  0.5,  0.0,  0.5,  1.0],
-        [1.2,  1.0,  0.7,  1.0,  1.2]
-    ])
+    cup_handle_kernel = np.array(
+        [
+            [0.0, 0.0, 0.0, 0.0, -0.5],
+            [0.3, 0.0, -0.3, -0.3, -0.2],
+            [0.7, 0.0, -0.7, 0.0, 0.0],
+            [1.0, 0.5, 0.0, 0.5, 1.0],
+            [1.2, 1.0, 0.7, 1.0, 1.2],
+        ]
+    )
 
     # Accumulation breakout pattern (bullish)
-    accumulation_breakout_kernel = np.array([
-        [-0.5, -0.5, -0.5, -0.5, -0.5],
-        [-0.2, -0.2, -0.2, -0.2, -0.2],
-        [0.0,  0.0,  0.0,  0.0,  0.0],
-        [0.5,  0.7,  0.9,  1.1,  1.3],
-        [1.0,  1.2,  1.4,  1.6,  1.8]
-    ])
+    accumulation_breakout_kernel = np.array(
+        [
+            [-0.5, -0.5, -0.5, -0.5, -0.5],
+            [-0.2, -0.2, -0.2, -0.2, -0.2],
+            [0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.7, 0.9, 1.1, 1.3],
+            [1.0, 1.2, 1.4, 1.6, 1.8],
+        ]
+    )
 
     # 9. Recurrence plot specific - stronger repetitive pattern detection
-    diagonal_kernel = np.array([
-        [1.2,  0.0,  0.0,  0.0,  0.0],
-        [0.0,  1.2,  0.0,  0.0,  0.0],
-        [0.0,  0.0,  1.2,  0.0,  0.0],
-        [0.0,  0.0,  0.0,  1.2,  0.0],
-        [0.0,  0.0,  0.0,  0.0,  1.2]
-    ])
+    diagonal_kernel = np.array(
+        [
+            [1.2, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 1.2, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.2, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.2, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 1.2],
+        ]
+    )
 
     # Periodicity detection kernel - enhanced periodicity recognition
-    periodicity_kernel = np.array([
-        [1.2,  0.0, -1.2,  0.0,  1.2],
-        [0.0, -1.2,  0.0, -1.2,  0.0],
-        [-1.2,  0.0,  1.2,  0.0, -1.2],
-        [0.0, -1.2,  0.0, -1.2,  0.0],
-        [1.2,  0.0, -1.2,  0.0,  1.2]
-    ])
+    periodicity_kernel = np.array(
+        [
+            [1.2, 0.0, -1.2, 0.0, 1.2],
+            [0.0, -1.2, 0.0, -1.2, 0.0],
+            [-1.2, 0.0, 1.2, 0.0, -1.2],
+            [0.0, -1.2, 0.0, -1.2, 0.0],
+            [1.2, 0.0, -1.2, 0.0, 1.2],
+        ]
+    )
 
     # 10. MTF specific - enhanced market state transition recognition
-    jump_kernel = np.array([
-        [2.5,  1.2,  0.0, -1.2, -2.5],
-        [1.2,  0.0, -1.2, -2.5, -1.2],
-        [0.0, -1.2, -2.5, -1.2,  0.0],
-        [-1.2, -2.5, -1.2,  0.0,  1.2],
-        [-2.5, -1.2,  0.0,  1.2,  2.5]
-    ])
+    jump_kernel = np.array(
+        [
+            [2.5, 1.2, 0.0, -1.2, -2.5],
+            [1.2, 0.0, -1.2, -2.5, -1.2],
+            [0.0, -1.2, -2.5, -1.2, 0.0],
+            [-1.2, -2.5, -1.2, 0.0, 1.2],
+            [-2.5, -1.2, 0.0, 1.2, 2.5],
+        ]
+    )
 
     # Price breakout detection kernel - enhanced upward breakout signals
-    breakout_kernel = np.array([
-        [-1.0, -1.0,  3.0, -1.0, -1.0],
-        [-1.0, -1.0,  3.0, -1.0, -1.0],
-        [-1.0, -1.0,  3.0, -1.0, -1.0],
-        [-1.0, -1.0,  3.0, -1.0, -1.0],
-        [-1.0, -1.0,  3.0, -1.0, -1.0]
-    ])
+    breakout_kernel = np.array(
+        [
+            [-1.0, -1.0, 3.0, -1.0, -1.0],
+            [-1.0, -1.0, 3.0, -1.0, -1.0],
+            [-1.0, -1.0, 3.0, -1.0, -1.0],
+            [-1.0, -1.0, 3.0, -1.0, -1.0],
+            [-1.0, -1.0, 3.0, -1.0, -1.0],
+        ]
+    )
 
     # Group convolution kernels by image representation type, focusing on enhancing uptrend pattern detection
     return {
         # GASF is best for capturing overall patterns and trends
-        'gasf': [
-            uptrend_kernel,             # uptrend
-            downtrend_kernel,           # downtrend
-            level_kernel,               # support/resistance levels
+        "gasf": [
+            uptrend_kernel,  # uptrend
+            downtrend_kernel,  # downtrend
+            level_kernel,  # support/resistance levels
             # cup and handle pattern (bullish signal)
             cup_handle_kernel,
             # accumulation breakout (bullish signal)
             accumulation_breakout_kernel,
             head_shoulders_top_kernel,  # head and shoulders top
             head_shoulders_bottom_kernel,  # head and shoulders bottom
-            double_top_kernel,          # double top
-            double_bottom_kernel        # double bottom
+            double_top_kernel,  # double top
+            double_bottom_kernel,  # double bottom
         ],
-
         # GADF is best for capturing directional changes and turning points
-        'gadf': [
-            trend_change_kernel,        # trend change
-            v_bottom_kernel,            # V-shaped bottom
-            bounce_kernel,              # price bounce pattern
-            breakout_up_kernel          # upward breakout signal
+        "gadf": [
+            trend_change_kernel,  # trend change
+            v_bottom_kernel,  # V-shaped bottom
+            bounce_kernel,  # price bounce pattern
+            breakout_up_kernel,  # upward breakout signal
         ],
-
         # RP is best for capturing repetitive structures and periodicity
-        'rp': [
-            diagonal_kernel,            # diagonal (repetitive patterns)
-            periodicity_kernel,         # periodicity patterns
-            symmetric_triangle_kernel   # symmetric triangle
+        "rp": [
+            diagonal_kernel,  # diagonal (repetitive patterns)
+            periodicity_kernel,  # periodicity patterns
+            symmetric_triangle_kernel,  # symmetric triangle
         ],
-
         # MTF is best for capturing state transitions and market structure changes
-        'mtf': [
-            jump_kernel,                # price jump
-            breakout_kernel,            # price breakout
-            ascending_triangle_kernel   # ascending triangle (bullish signal)
-        ]
+        "mtf": [
+            jump_kernel,  # price jump
+            breakout_kernel,  # price breakout
+            ascending_triangle_kernel,  # ascending triangle (bullish signal)
+        ],
     }
+
 
 # ----------------------------------------
 # Part 4: PyTorch Model Architecture
@@ -521,8 +567,7 @@ class AttentionBlock(nn.Module):
     def __init__(self, in_channels):
         super(AttentionBlock, self).__init__()
         self.attention = nn.Sequential(
-            nn.Conv2d(in_channels, 1, kernel_size=1),
-            nn.Sigmoid()
+            nn.Conv2d(in_channels, 1, kernel_size=1), nn.Sigmoid()
         )
 
     def forward(self, x):
@@ -541,11 +586,9 @@ class SingleBranchCNN(nn.Module):
             # Use specialized convolution kernels
             num_kernels = len(kernel_weights)
             # Create convolution layer and initialize weights
-            self.conv1 = nn.Conv2d(
-                in_channels, num_kernels, kernel_size=5, padding=2)
+            self.conv1 = nn.Conv2d(in_channels, num_kernels, kernel_size=5, padding=2)
             # Initialize weights
-            kernel_tensor = torch.FloatTensor(
-                np.array(kernel_weights)).unsqueeze(1)
+            kernel_tensor = torch.FloatTensor(np.array(kernel_weights)).unsqueeze(1)
             self.conv1.weight.data = kernel_tensor
             self.conv1.bias.data.fill_(0.0)
         else:
@@ -556,8 +599,7 @@ class SingleBranchCNN(nn.Module):
         self.bn1 = nn.BatchNorm2d(self.conv1.out_channels)
         self.relu = nn.ReLU()
         self.pool = nn.MaxPool2d(2)
-        self.conv2 = nn.Conv2d(self.conv1.out_channels,
-                               32, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(self.conv1.out_channels, 32, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(32)
         self.attention = AttentionBlock(32)  # Add attention mechanism
 
@@ -589,13 +631,17 @@ class ATLASModel(nn.Module):
         # 各通道分支
         if self.use_specialized_kernels:
             self.gasf_branch = SingleBranchCNN(
-                in_channels=1, kernel_weights=kernels['gasf'])
+                in_channels=1, kernel_weights=kernels["gasf"]
+            )
             self.gadf_branch = SingleBranchCNN(
-                in_channels=1, kernel_weights=kernels['gadf'])
+                in_channels=1, kernel_weights=kernels["gadf"]
+            )
             self.rp_branch = SingleBranchCNN(
-                in_channels=1, kernel_weights=kernels['rp'])
+                in_channels=1, kernel_weights=kernels["rp"]
+            )
             self.mtf_branch = SingleBranchCNN(
-                in_channels=1, kernel_weights=kernels['mtf'])
+                in_channels=1, kernel_weights=kernels["mtf"]
+            )
         else:
             self.gasf_branch = SingleBranchCNN(in_channels=1)
             self.gadf_branch = SingleBranchCNN(in_channels=1)
@@ -617,9 +663,9 @@ class ATLASModel(nn.Module):
             nn.Linear(64, 32),
             nn.BatchNorm1d(32),
             nn.ReLU(),
-            nn.Dropout(dropout_rate/2),
+            nn.Dropout(dropout_rate / 2),
             nn.Linear(32, 1),  # 二元分类
-            nn.Sigmoid()       # Sigmoid激活用于二元分类
+            nn.Sigmoid(),  # Sigmoid激活用于二元分类
         )
 
     def forward(self, x):
@@ -646,21 +692,32 @@ class ATLASModel(nn.Module):
 
         # 特征融合
         combined = torch.cat(
-            [gasf_features, gadf_features, rp_features, mtf_features], dim=1)
+            [gasf_features, gadf_features, rp_features, mtf_features], dim=1
+        )
 
         # 分类
         output = self.classifier(combined)
         return output
+
 
 # ----------------------------------------
 # 第5部分: 训练和评估函数
 # ----------------------------------------
 
 
-def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler=None,
-                num_epochs=30, device=device, patience=10,
-                best_model_save_path='models/atlas_binary_model_best.pth',
-                last_model_save_path='models/atlas_binary_model_last.pth'):
+def train_model(
+    model,
+    train_loader,
+    val_loader,
+    criterion,
+    optimizer,
+    scheduler=None,
+    num_epochs=30,
+    device=device,
+    patience=10,
+    best_model_save_path="models/atlas_binary_model_best.pth",
+    last_model_save_path="models/atlas_binary_model_last.pth",
+):
     """
     训练二元分类模型
 
@@ -680,18 +737,13 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
     返回:
     dict: 训练历史记录
     """
-    history = {
-        'train_loss': [],
-        'train_acc': [],
-        'val_loss': [],
-        'val_acc': []
-    }
+    history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
     # Dropout
     model.dropout = nn.Dropout(0.5)
 
     # 最佳模型保存
-    best_val_loss = float('inf')
+    best_val_loss = float("inf")
     no_improve_epochs = 0
 
     for epoch in range(num_epochs):
@@ -701,7 +753,9 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
         train_correct = 0
         train_total = 0
 
-        for inputs, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Train]"):
+        for inputs, labels in tqdm(
+            train_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Train]"
+        ):
             inputs, labels = inputs.to(device), labels.to(device)
 
             # 梯度清零
@@ -731,7 +785,9 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
         val_total = 0
 
         with torch.no_grad():
-            for inputs, labels in tqdm(val_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Val]"):
+            for inputs, labels in tqdm(
+                val_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Val]"
+            ):
                 inputs, labels = inputs.to(device), labels.to(device)
 
                 # 前向传播
@@ -755,15 +811,17 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
                 scheduler.step()
 
         # 记录历史
-        history['train_loss'].append(train_loss)
-        history['train_acc'].append(train_acc)
-        history['val_loss'].append(val_loss)
-        history['val_acc'].append(val_acc)
+        history["train_loss"].append(train_loss)
+        history["train_acc"].append(train_acc)
+        history["val_loss"].append(val_loss)
+        history["val_acc"].append(val_acc)
 
         # 输出进度
-        print(f'Epoch {epoch+1}/{num_epochs} | '
-              f'Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} | '
-              f'Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}')
+        print(
+            f"Epoch {epoch+1}/{num_epochs} | "
+            f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} | "
+            f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}"
+        )
 
         # 保存最佳模型
         if val_loss < best_val_loss:
@@ -843,8 +901,9 @@ def evaluate_binary_model(model, test_loader, criterion, device=device):
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0
     specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
-    f1 = 2 * precision * recall / \
-        (precision + recall) if (precision + recall) > 0 else 0
+    f1 = (
+        2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    )
 
     # 打印详细指标
     print("\n二元分类指标:")
@@ -855,12 +914,18 @@ def evaluate_binary_model(model, test_loader, criterion, device=device):
 
     # 绘制混淆矩阵
     plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=['下跌', '上涨'], yticklabels=['下跌', '上涨'])
-    plt.xlabel('预测')
-    plt.ylabel('真实')
-    plt.title('混淆矩阵')
-    plt.savefig('results/binary_confusion_matrix.png')
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=["下跌", "上涨"],
+        yticklabels=["下跌", "上涨"],
+    )
+    plt.xlabel("预测")
+    plt.ylabel("真实")
+    plt.title("混淆矩阵")
+    plt.savefig("results/binary_confusion_matrix.png")
     plt.show()
 
     # 绘制ROC曲线和PR曲线
@@ -884,14 +949,13 @@ def plot_binary_metrics(true_labels, predicted_probs):
     plt.figure(figsize=(12, 5))
 
     plt.subplot(1, 2, 1)
-    plt.plot(fpr, tpr, color='darkorange', lw=2,
-             label=f'ROC曲线 (AUC = {roc_auc:.2f})')
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.plot(fpr, tpr, color="darkorange", lw=2, label=f"ROC曲线 (AUC = {roc_auc:.2f})")
+    plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel('假正率 (False Positive Rate)')
-    plt.ylabel('真正率 (True Positive Rate)')
-    plt.title('ROC曲线')
+    plt.xlabel("假正率 (False Positive Rate)")
+    plt.ylabel("真正率 (True Positive Rate)")
+    plt.title("ROC曲线")
     plt.legend(loc="lower right")
 
     # PR曲线
@@ -899,27 +963,46 @@ def plot_binary_metrics(true_labels, predicted_probs):
     avg_precision = average_precision_score(true_labels, predicted_probs)
 
     plt.subplot(1, 2, 2)
-    plt.plot(recall, precision, color='blue', lw=2,
-             label=f'PR曲线 (AP = {avg_precision:.2f})')
-    plt.axhline(y=sum(true_labels)/len(true_labels), color='red', linestyle='--',
-                label=f'基准 (正例比例 = {sum(true_labels)/len(true_labels):.2f})')
+    plt.plot(
+        recall,
+        precision,
+        color="blue",
+        lw=2,
+        label=f"PR曲线 (AP = {avg_precision:.2f})",
+    )
+    plt.axhline(
+        y=sum(true_labels) / len(true_labels),
+        color="red",
+        linestyle="--",
+        label=f"基准 (正例比例 = {sum(true_labels)/len(true_labels):.2f})",
+    )
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel('召回率 (Recall)')
-    plt.ylabel('精确率 (Precision)')
-    plt.title('精确率-召回率曲线')
+    plt.xlabel("召回率 (Recall)")
+    plt.ylabel("精确率 (Precision)")
+    plt.title("精确率-召回率曲线")
     plt.legend(loc="lower left")
 
     plt.tight_layout()
-    plt.savefig('results/binary_metrics.png')
+    plt.savefig("results/binary_metrics.png")
     plt.show()
+
 
 # ----------------------------------------
 # 第6部分: 可视化和解释工具
 # ----------------------------------------
 
 
-def visualize_sample(time_series, transformed_image, prediction=None, true_label=None, prob=None, all_features=None, index=None, save_path=None):
+def visualize_sample(
+    time_series,
+    transformed_image,
+    prediction=None,
+    true_label=None,
+    prob=None,
+    all_features=None,
+    index=None,
+    save_path=None,
+):
     """
     可视化时间序列样本及其图像转换
 
@@ -939,17 +1022,17 @@ def visualize_sample(time_series, transformed_image, prediction=None, true_label
 
     # 时间序列 - 只显示收盘价
     ax0 = plt.subplot(gs[0, :])
-    ax0.plot(time_series, label='Close Price')
-    ax0.set_title('Price Time Series', fontsize=15)
+    ax0.plot(time_series, label="Close Price")
+    ax0.set_title("Price Time Series", fontsize=15)
     ax0.legend()
     ax0.grid(True)
 
     # 如果是二元分类，添加颜色条以指示预测
     if prediction is not None and true_label is not None:
-        if prediction == 'up':
-            color = 'green' if prediction == true_label else 'darkred'
+        if prediction == "up":
+            color = "green" if prediction == true_label else "darkred"
         else:  # prediction == 'down'
-            color = 'red' if prediction == true_label else 'darkgreen'
+            color = "red" if prediction == true_label else "darkgreen"
 
         ax0.axhspan(min(time_series), max(time_series), alpha=0.2, color=color)
 
@@ -960,9 +1043,9 @@ def visualize_sample(time_series, transformed_image, prediction=None, true_label
             ax1 = plt.subplot(gs[1, 0])
             # 显示技术指标
             for i in range(1, min(5, n_features)):  # 最多显示4个其他特征
-                ax1.plot(all_features[:, i], label=f'Feature {i}')
-            ax1.set_title('Technical Indicators', fontsize=12)
-            ax1.legend(loc='upper right')
+                ax1.plot(all_features[:, i], label=f"Feature {i}")
+            ax1.set_title("Technical Indicators", fontsize=12)
+            ax1.legend(loc="upper right")
             ax1.grid(True)
 
             # 图像表示从第二个位置开始
@@ -973,8 +1056,8 @@ def visualize_sample(time_series, transformed_image, prediction=None, true_label
         start_col = 0
 
     # 四种图像表示
-    titles = ['GASF', 'GADF', 'Recurrence Plot', 'MTF']
-    cmaps = ['viridis', 'plasma', 'binary', 'hot']
+    titles = ["GASF", "GADF", "Recurrence Plot", "MTF"]
+    cmaps = ["viridis", "plasma", "binary", "hot"]
 
     for i in range(4):
         row = 1 + (i // (3 - start_col))
@@ -995,14 +1078,20 @@ def visualize_sample(time_series, transformed_image, prediction=None, true_label
             prob_str = f" (概率: {prob:.2f})" if prob is not None else ""
             info_text += f"预测结果: {prediction}{prob_str}"
 
-        fig.text(0.5, 0.01, info_text, ha='center', fontsize=12,
-                 bbox=dict(facecolor='yellow', alpha=0.2))
+        fig.text(
+            0.5,
+            0.01,
+            info_text,
+            ha="center",
+            fontsize=12,
+            bbox=dict(facecolor="yellow", alpha=0.2),
+        )
 
     plt.tight_layout()
 
     # 保存图像
     if save_path:
-        plt.savefig(save_path, bbox_inches='tight')
+        plt.savefig(save_path, bbox_inches="tight")
 
     plt.show()
 
@@ -1017,25 +1106,25 @@ def visualize_training_history(history):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
 
     # 准确率
-    ax1.plot(history['train_acc'], label='Train')
-    ax1.plot(history['val_acc'], label='Validation')
-    ax1.set_title('Model Accuracy')
-    ax1.set_ylabel('Accuracy')
-    ax1.set_xlabel('Epoch')
-    ax1.legend(loc='lower right')
+    ax1.plot(history["train_acc"], label="Train")
+    ax1.plot(history["val_acc"], label="Validation")
+    ax1.set_title("Model Accuracy")
+    ax1.set_ylabel("Accuracy")
+    ax1.set_xlabel("Epoch")
+    ax1.legend(loc="lower right")
     ax1.grid(True)
 
     # 损失
-    ax2.plot(history['train_loss'], label='Train')
-    ax2.plot(history['val_loss'], label='Validation')
-    ax2.set_title('Model Loss')
-    ax2.set_ylabel('Loss')
-    ax2.set_xlabel('Epoch')
-    ax2.legend(loc='upper right')
+    ax2.plot(history["train_loss"], label="Train")
+    ax2.plot(history["val_loss"], label="Validation")
+    ax2.set_title("Model Loss")
+    ax2.set_ylabel("Loss")
+    ax2.set_xlabel("Epoch")
+    ax2.legend(loc="upper right")
     ax2.grid(True)
 
     plt.tight_layout()
-    plt.savefig('results/binary_training_history.png', bbox_inches='tight')
+    plt.savefig("results/binary_training_history.png", bbox_inches="tight")
     plt.show()
 
 
@@ -1056,59 +1145,82 @@ def plot_predictions_over_time(predictions, true_labels, probs, indices):
 
     # 绘制预测概率
     plt.subplot(2, 1, 1)
-    plt.plot(indices, probs, 'b-', alpha=0.7, label='预测概率')
-    plt.axhline(y=0.5, color='gray', linestyle='--', label='决策阈值')
+    plt.plot(indices, probs, "b-", alpha=0.7, label="预测概率")
+    plt.axhline(y=0.5, color="gray", linestyle="--", label="决策阈值")
 
     # 标记错误预测
-    incorrect = (predictions != true_labels)
-    plt.scatter(indices[incorrect], probs[incorrect],
-                color='red', marker='x', s=50, label='错误预测')
+    incorrect = predictions != true_labels
+    plt.scatter(
+        indices[incorrect],
+        probs[incorrect],
+        color="red",
+        marker="x",
+        s=50,
+        label="错误预测",
+    )
 
-    plt.title('预测概率随时间变化')
-    plt.ylabel('上涨概率')
+    plt.title("预测概率随时间变化")
+    plt.ylabel("上涨概率")
     plt.legend()
     plt.grid(True)
 
     # 绘制真实标签和预测
     plt.subplot(2, 1, 2)
-    plt.scatter(indices, plot_true, color='blue',
-                marker='o', alpha=0.7, label='真实标签')
+    plt.scatter(
+        indices, plot_true, color="blue", marker="o", alpha=0.7, label="真实标签"
+    )
 
     # 使用不同颜色标记正确和错误预测
     correct = ~incorrect
-    plt.scatter(indices[correct], plot_true[correct],
-                color='green', marker='o', s=100, alpha=0.5, label='正确预测')
-    plt.scatter(indices[incorrect], plot_true[incorrect],
-                color='red', marker='x', s=100, label='错误预测')
+    plt.scatter(
+        indices[correct],
+        plot_true[correct],
+        color="green",
+        marker="o",
+        s=100,
+        alpha=0.5,
+        label="正确预测",
+    )
+    plt.scatter(
+        indices[incorrect],
+        plot_true[incorrect],
+        color="red",
+        marker="x",
+        s=100,
+        label="错误预测",
+    )
 
-    plt.title('真实标签和预测随时间变化')
-    plt.ylabel('标签 (1=上涨, -1=下跌)')
-    plt.yticks([-1, 1], ['下跌', '上涨'])
+    plt.title("真实标签和预测随时间变化")
+    plt.ylabel("标签 (1=上涨, -1=下跌)")
+    plt.yticks([-1, 1], ["下跌", "上涨"])
     plt.legend()
     plt.grid(True)
 
     plt.tight_layout()
-    plt.savefig('results/predictions_over_time.png', bbox_inches='tight')
+    plt.savefig("results/predictions_over_time.png", bbox_inches="tight")
     plt.show()
+
 
 # ----------------------------------------
 # 第7部分: 执行流程
 # ----------------------------------------
 
 
-def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
-                              data_dir='data_short',
-                              window_size=50,
-                              stride=10,
-                              image_size=50,
-                              use_specialized_kernels=True,
-                              epochs=50,
-                              batch_size=32,
-                              learning_rate=0.001,
-                              patience=10,
-                              validation_size=0.2,
-                              gap_size=10,
-                              threshold=0.5):
+def run_atlas_binary_pipeline(
+    ticker_list=["AAPL", "MSFT", "GOOGL"],
+    data_dir="data_short",
+    window_size=50,
+    stride=10,
+    image_size=50,
+    use_specialized_kernels=True,
+    epochs=50,
+    batch_size=32,
+    learning_rate=0.001,
+    patience=10,
+    validation_size=0.2,
+    gap_size=10,
+    threshold=0.5,
+):
     """
     运行ATLAS二元分类流程
 
@@ -1131,17 +1243,30 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
     tuple: (训练好的模型, 测试数据)
     """
     # 确保输出目录存在
-    os.makedirs('models', exist_ok=True)
-    os.makedirs('results', exist_ok=True)
+    os.makedirs("models", exist_ok=True)
+    os.makedirs("results", exist_ok=True)
 
     # 步骤1: 加载和处理数据
     all_windows = []
     all_labels = []
     all_indices = []
 
-    selected_features = ['Close', 'Open', 'High', 'Low', 'Volume',
-                         'MA5', 'MA20', 'MACD', 'RSI', 'Upper', 'Lower',
-                         'CRSI', 'Kalman_Trend', 'FFT_21']
+    selected_features = [
+        "Close",
+        "Open",
+        "High",
+        "Low",
+        "Volume",
+        "MA5",
+        "MA20",
+        "MACD",
+        "RSI",
+        "Upper",
+        "Lower",
+        "CRSI",
+        "Kalman_Trend",
+        "FFT_21",
+    ]
 
     for ticker in ticker_list:
         print(f"\n处理股票: {ticker}")
@@ -1151,7 +1276,10 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
 
             # 提取窗口和标签
             windows, labels, indices = extract_windows_with_stride(
-                stock_data, window_size=window_size, stride=stride, features=selected_features
+                stock_data,
+                window_size=window_size,
+                stride=stride,
+                features=selected_features,
             )
 
             all_windows.extend(windows)
@@ -1178,14 +1306,16 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
 
     # 步骤2: 将时间序列转换为图像表示
     print("\n将时间序列转换为图像...")
-    transformed_images = transform_3d_to_images(
-        all_windows, image_size=image_size)
+    transformed_images = transform_3d_to_images(all_windows, image_size=image_size)
 
     # 步骤3: 按时间顺序分割训练集和测试集
     print("\n分割训练集和测试集...")
     X_train, X_test, y_train, y_test, train_indices, test_indices = time_series_split(
-        transformed_images, all_indices, numeric_labels,
-        test_size=0.2, gap_size=gap_size
+        transformed_images,
+        all_indices,
+        numeric_labels,
+        test_size=0.2,
+        gap_size=gap_size,
     )
 
     # 进一步将训练集分为训练和验证
@@ -1220,8 +1350,7 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
     val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
     test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 
-    train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
@@ -1230,14 +1359,15 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
 
     # 获取输入形状
     input_shape = (
-        transformed_images.shape[1], transformed_images.shape[2], transformed_images.shape[3])
+        transformed_images.shape[1],
+        transformed_images.shape[2],
+        transformed_images.shape[3],
+    )
     print(f"模型输入形状: {input_shape}")
 
-    model = ATLASModel(
-        input_shape=input_shape,
-        kernels=kernels,
-        dropout_rate=0.5
-    ).to(device)
+    model = ATLASModel(input_shape=input_shape, kernels=kernels, dropout_rate=0.5).to(
+        device
+    )
 
     # 打印模型结构
     print("\n模型结构:")
@@ -1257,14 +1387,24 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
 
     # 学习率调度
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=5,
+        optimizer,
+        mode="min",
+        factor=0.5,
+        patience=5,
     )
 
     # 训练模型
     print("\n开始训练模型...")
     history = train_model(
-        model, train_loader, val_loader, criterion, optimizer, scheduler,
-        num_epochs=epochs, device=device, patience=patience,
+        model,
+        train_loader,
+        val_loader,
+        criterion,
+        optimizer,
+        scheduler,
+        num_epochs=epochs,
+        device=device,
+        patience=patience,
     )
 
     # 可视化训练历史
@@ -1272,7 +1412,7 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
 
     # 步骤6: 加载最佳模型并评估
     print("\n加载最佳模型进行评估...")
-    model.load_state_dict(torch.load('models/atlas_binary_model_best.pth'))
+    model.load_state_dict(torch.load("models/atlas_binary_model_best.pth"))
 
     test_loss, test_acc, test_probs, test_labels = evaluate_binary_model(
         model, test_loader, criterion, device
@@ -1282,8 +1422,7 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
     test_preds = (test_probs > 0.5).astype(int)
 
     # 绘制预测随时间变化的图表
-    plot_predictions_over_time(
-        test_preds, test_labels, test_probs, test_indices)
+    plot_predictions_over_time(test_preds, test_labels, test_probs, test_indices)
 
     # 步骤7: 可视化一些预测样本
     print("\n可视化一些预测样本...")
@@ -1306,8 +1445,8 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
             sample_window = all_windows[original_idx]
 
             # 获取标签和预测
-            pred = 'up' if test_preds[idx_in_test] == 1 else 'down'
-            true = 'up' if test_labels[idx_in_test] == 1 else 'down'
+            pred = "up" if test_preds[idx_in_test] == 1 else "down"
+            true = "up" if test_labels[idx_in_test] == 1 else "down"
             prob = test_probs[idx_in_test]
 
             # 可视化
@@ -1319,7 +1458,7 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
                 prob=prob,
                 all_features=sample_window,
                 index=sample_window_idx,
-                save_path=f'results/binary_correct_prediction_{idx_in_test}.png'
+                save_path=f"results/binary_correct_prediction_{idx_in_test}.png",
             )
 
     # 取一些错误预测的样本
@@ -1337,8 +1476,8 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
             sample_window = all_windows[original_idx]
 
             # 获取标签和预测
-            pred = 'up' if test_preds[idx_in_test] == 1 else 'down'
-            true = 'up' if test_labels[idx_in_test] == 1 else 'down'
+            pred = "up" if test_preds[idx_in_test] == 1 else "down"
+            true = "up" if test_labels[idx_in_test] == 1 else "down"
             prob = test_probs[idx_in_test]
 
             # 可视化
@@ -1350,19 +1489,19 @@ def run_atlas_binary_pipeline(ticker_list=['AAPL', 'MSFT', 'GOOGL'],
                 prob=prob,
                 all_features=sample_window,
                 index=sample_window_idx,
-                save_path=f'results/binary_incorrect_prediction_{idx_in_test}.png'
+                save_path=f"results/binary_incorrect_prediction_{idx_in_test}.png",
             )
 
     # 保存模型及相关信息
     model_info = {
-        'class_names': class_names,
-        'input_shape': input_shape,
-        'window_size': window_size,
-        'image_size': transformed_images.shape[1],
-        'test_accuracy': test_acc,
-        'selected_features': selected_features
+        "class_names": class_names,
+        "input_shape": input_shape,
+        "window_size": window_size,
+        "image_size": transformed_images.shape[1],
+        "test_accuracy": test_acc,
+        "selected_features": selected_features,
     }
-    joblib.dump(model_info, 'models/atlas_binary_model_info.pkl')
+    joblib.dump(model_info, "models/atlas_binary_model_info.pkl")
 
     return model, (X_test, y_test, test_indices, test_probs)
 
@@ -1377,36 +1516,135 @@ def main():
     print("=" * 50)
 
     # 股票列表
-    ticker_list = ['AAPL', 'MSFT', 'GOOGL',
-                   'AMZN', 'TSLA', 'NVDA', 'META', 'QQQ',]
-    ticker_list = ['AAPL', 'ABBV', 'ABT', 'ADBE', 'AMD', 'AMGN', 'AMT', 'AMZN', 'AXP',
-                   'BAC', 'BLK', 'BMY', 'C', 'CAT', 'CCI', 'CMCSA', 'COP', 'COST',
-                   'CRM', 'CSCO', 'CVS', 'CVX', 'DHR', 'DIS', 'DOW', 'EMR', 'EOG',
-                   'EQIX', 'ETN', 'FCX', 'FDX', 'GD', 'GE', 'GILD', 'GOOGL', 'GS',
-                   'HAL', 'HD', 'HON', 'HUM', 'IBM', 'INTC', 'ISRG', 'JNJ', 'JPM',
-                   'KMB', 'KO', 'LIN', 'LLY', 'LMT', 'LOW', 'MA', 'MCD', 'MET', 'META',
-                   'MMM', 'MPC', 'MRK', 'MS', 'MSFT', 'MU', 'NFLX', 'NKE', 'NOW', 'NSC',
-                   'NVDA', 'ORCL', 'PEP', 'PFE', 'PG', 'PLD', 'PNC', 'PPG', 'PSA',
-                   'QCOM', 'REGN', 'ROK', 'RTX', 'SBUX', 'SCHW', 'SHW', 'SLB', 'SPG',
-                   'T', 'TGT', 'TMO', 'TSLA', 'UNH', 'UNP', 'UPS', 'USB', 'V', 'VLO',
-                   'VRTX', 'VZ', 'WFC', 'WM', 'WMT', 'XOM', 'ZTS']
+    ticker_list = [
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "AMZN",
+        "TSLA",
+        "NVDA",
+        "META",
+        "QQQ",
+    ]
+    ticker_list = [
+        "AAPL",
+        "ABBV",
+        "ABT",
+        "ADBE",
+        "AMD",
+        "AMGN",
+        "AMT",
+        "AMZN",
+        "AXP",
+        "BAC",
+        "BLK",
+        "BMY",
+        "C",
+        "CAT",
+        "CCI",
+        "CMCSA",
+        "COP",
+        "COST",
+        "CRM",
+        "CSCO",
+        "CVS",
+        "CVX",
+        "DHR",
+        "DIS",
+        "DOW",
+        "EMR",
+        "EOG",
+        "EQIX",
+        "ETN",
+        "FCX",
+        "FDX",
+        "GD",
+        "GE",
+        "GILD",
+        "GOOGL",
+        "GS",
+        "HAL",
+        "HD",
+        "HON",
+        "HUM",
+        "IBM",
+        "INTC",
+        "ISRG",
+        "JNJ",
+        "JPM",
+        "KMB",
+        "KO",
+        "LIN",
+        "LLY",
+        "LMT",
+        "LOW",
+        "MA",
+        "MCD",
+        "MET",
+        "META",
+        "MMM",
+        "MPC",
+        "MRK",
+        "MS",
+        "MSFT",
+        "MU",
+        "NFLX",
+        "NKE",
+        "NOW",
+        "NSC",
+        "NVDA",
+        "ORCL",
+        "PEP",
+        "PFE",
+        "PG",
+        "PLD",
+        "PNC",
+        "PPG",
+        "PSA",
+        "QCOM",
+        "REGN",
+        "ROK",
+        "RTX",
+        "SBUX",
+        "SCHW",
+        "SHW",
+        "SLB",
+        "SPG",
+        "T",
+        "TGT",
+        "TMO",
+        "TSLA",
+        "UNH",
+        "UNP",
+        "UPS",
+        "USB",
+        "V",
+        "VLO",
+        "VRTX",
+        "VZ",
+        "WFC",
+        "WM",
+        "WMT",
+        "XOM",
+        "ZTS",
+    ]
     # ticker_list = ['000001.SS', 'AAPL', 'ABBV', 'ABT', 'ADBE', 'AIG', 'ALB', 'ALL', 'AMAT', 'AMD', 'AMGN', 'AMT', 'AMZN', 'APA', 'APD', 'ARE', 'ARKK', 'AVB', 'AXP', 'BA', 'BABA', 'BAC', 'BIDU', 'BIIB', 'BILI', 'BK', 'BKR', 'BLK', 'BMY', 'BXP', 'C', 'CAT', 'CCI', 'CE', 'CF', 'CI', 'CL', 'CMCSA', 'CMI', 'COF', 'COP', 'COST', 'CRM', 'CSCO', 'CVS', 'CVX', 'DD', 'DE', 'DHR', 'DIA', 'DIS', 'DLR', 'DOW', 'DVN', 'ECL', 'EEM', 'EL', 'EMN', 'EMR', 'EOG', 'EP', 'EQIX', 'EQR', 'ESS', 'ETN', 'FANG', 'FCX', 'FDX', 'FMC', 'GD', 'GDX', 'GE', 'GILD', 'GIS', 'GOOGL', 'GOTU', 'GS', 'HAL', 'HD', 'HES', 'HON', 'HST', 'HUM', 'HYG', 'IBM', 'IEMG', 'IFF', 'INTC', 'IQ', 'IR', 'ISRG', 'IVV', 'IWM', 'JD', 'JNJ', 'JPM', 'K', 'KIM', 'KMB', 'KMI', 'KO', 'LI', 'LIN', 'LLY', 'LMT', 'LOW', 'MA', 'MAA', 'MCD', 'MET', 'META', 'MLM', 'MMM', 'MOS', 'MPC', 'MRK', 'MRO', 'MS', 'MSFT', 'MU', 'NEM', 'NFLX', 'NIO', 'NKE', 'NOW', 'NSC', 'NUE', 'NVDA', 'O', 'ORCL', 'OXY', 'PDD', 'PEP', 'PFE', 'PG', 'PH', 'PLD', 'PNC', 'PPG', 'PRU', 'PSA', 'PSX', 'QCOM', 'QQQ', 'REG', 'REGN', 'ROK', 'RTX', 'SBUX', 'SCHW', 'SEE', 'SHW', 'SLB', 'SNOW', 'SPG', 'SPY', 'T', 'TFC', 'TGT', 'TLT', 'TME', 'TMO', 'TSLA', 'UDR', 'UNH', 'UNP', 'UPS', 'USB', 'USO', 'V', 'VLO', 'VMC', 'VNQ', 'VOO', 'VRTX', 'VTI', 'VTR', 'VZ', 'WELL', 'WFC', 'WM', 'WMB', 'WMT', 'XLE', 'XLF', 'XLK', 'XLP', 'XLY', 'XOM', 'XPEV', 'ZTS', '^DJI', '^FTSE', '^GDAXI', '^GSPC', '^HSI', '^IXIC', '^NDX', '^RUT', '^VIX']
 
     # 运行完整流程
     model, test_data = run_atlas_binary_pipeline(
         ticker_list=ticker_list,
-        data_dir='data',  # 数据目录
-        window_size=50,         # 时间窗口大小
-        stride=10,              # 步长，减少窗口重叠
-        image_size=50,          # 图像尺寸
+        data_dir="data",  # 数据目录
+        window_size=50,  # 时间窗口大小
+        stride=10,  # 步长，减少窗口重叠
+        image_size=50,  # 图像尺寸
         use_specialized_kernels=True,
         epochs=50,
         batch_size=32,
         learning_rate=0.001,
-        patience=15,            # 早停耐心值
+        patience=15,  # 早停耐心值
         validation_size=0.2,
-        gap_size=20,            # 训练和测试集间隔
-        threshold=0.5           # 标签生成阈值
+        gap_size=20,  # 训练和测试集间隔
+        threshold=0.5,  # 标签生成阈值
     )
 
     print("\n完成!")
