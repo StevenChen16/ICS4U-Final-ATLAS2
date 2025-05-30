@@ -85,11 +85,22 @@ Input (50×50×4) → [GASF|GADF|RP|MTF Branches] → Feature Fusion → Binary 
 | **Optimal Batch Size** | **32 (TFlops) / 8 (balanced)** |
 | **Hardware Tested** | **RTX 4060 Laptop GPU** |
 
-### Performance Analysis:
-- ✅ **Compact Model**: Achieves high accuracy with minimal parameters
-- ✅ **Expert Knowledge**: Successfully distills human trading expertise
-- ✅ **Robust Prediction**: Consistent performance across different stocks
-- ✅ **Interpretable**: Visual pattern recognition aligns with technical analysis
+### 🔥 Performance Analysis
+
+**Computational Efficiency:**
+- Achieves **0.044 TFlops** peak performance with only **17K parameters**
+- **Excellent parameter efficiency**: 2.58 GFlops per 1K parameters
+- **Scalable throughput**: 38.8x improvement from batch size 1→32
+
+**Real-time Capabilities:**
+- **Ultra-low latency**: 3.32ms minimum inference time
+- **High throughput**: 8,362 samples/sec peak processing
+- **Memory efficient**: Negligible GPU memory footprint
+
+**Optimization Benefits:**
+- **Knowledge-distilled kernels**: Enable compact yet powerful architecture
+- **Batch processing**: Linear scaling up to 32 samples
+- **Production ready**: Sub-4ms inference suitable for real-time trading
 
 ---
 
