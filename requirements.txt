@@ -1,0 +1,9 @@
+dash
+torch
+yfinance
+dash-bootstrap-components
+pyts
+matplotlib
+seaborn
+skimage
+tqdm
