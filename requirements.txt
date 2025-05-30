@@ -9,3 +9,6 @@ pyts
 matplotlib
 seaborn
 tqdm
+
+# for test
+GPUtil
