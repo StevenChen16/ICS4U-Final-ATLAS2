@@ -5,5 +5,5 @@ dash-bootstrap-components
 pyts
 matplotlib
 seaborn
-skimage
+scikit-image
 tqdm
