@@ -73,34 +73,35 @@ Input (50×50×4) → [GASF|GADF|RP|MTF Branches] → Feature Fusion → Binary 
 
 ## 🎯 Key Results
 
-| Metric | Value |
-|--------|--------|
-| **Validation Accuracy** | **82.5%** |
-| **Model Parameters** | **17,081** |
-| **Model Size** | **0.07 MB** |
-| **Peak Performance** | **0.044 TFlops** |
-| **Max Throughput** | **8,362 samples/sec** |
-| **Min Latency** | **3.32 ms** |
-| **Memory Efficient** | **< 0.1 MB GPU memory** |
-| **Optimal Batch Size** | **32 (TFlops) / 8 (balanced)** |
-| **Hardware Tested** | **RTX 4060 Laptop GPU** |
+| Metric | Tesla V100 (32GB) | Tesla P100(16G) | RTX 4060 Laptop |
+|--------|-------------|------------|------------------|
+| **Validation Accuracy** | **82.5%** | **82.5%** | **82.5%** |
+| **Model Parameters** | **17,081** | **17,081** | **17,081** |
+| **Model Size** | **0.07 MB** | **0.07 MB** | **0.07 MB** |
+| **Peak Performance** | **0.182 TFlops** | **0.111 TFlops** | **0.044 TFlops** |
+| **Max Throughput** | **20,415 samples/sec** | **12,505 samples/sec** | **8,362 samples/sec** |
+| **Min Latency** | **1.53 ms** | **2.23 ms** | **3.32 ms** |
+| **Memory Efficient** | **< 0.1 MB GPU memory** | **< 0.1 MB GPU memory** | **< 0.1 MB GPU memory** |
+| **Optimal Batch Size** | **32 (TFlops) / 8 (balanced)** | **32 (TFlops) / 8 (balanced)** | **32 (TFlops) / 8 (balanced)** |
+| **Torch.Compile Speedup** | **0.97x** | **0.98x** | **N/A** |
+| **Batch Scaling** | **31.8x (BS1→BS32)** | **27.9x (BS1→BS32)** | **38.8x (BS1→BS32)** |
 
 ### 🔥 Performance Analysis
 
 **Computational Efficiency:**
-- Achieves **0.044 TFlops** peak performance with only **17K parameters**
-- **Excellent parameter efficiency**: 2.58 GFlops per 1K parameters
-- **Scalable throughput**: 38.8x improvement from batch size 1→32
+- Achieves **0.182 TFlops** peak performance on V100 (4.1x improvement over laptop, 64% over Kaggle)
+- **Excellent parameter efficiency**: 10.66 GFlops per 1K parameters (V100) vs 6.50 (Kaggle) vs 2.58 (laptop)
+- **Linear scalability**: Performance scales consistently with GPU compute capability
 
 **Real-time Capabilities:**
-- **Ultra-low latency**: 3.32ms minimum inference time
-- **High throughput**: 8,362 samples/sec peak processing
-- **Memory efficient**: Negligible GPU memory footprint
+- **Ultra-low latency**: 1.53ms minimum inference time on V100 (54% faster than laptop, 31% faster than Kaggle)
+- **High throughput**: 20,415 samples/sec peak processing (144% improvement over laptop, 63% over Kaggle)
+- **Memory efficient**: Negligible GPU memory footprint across all platforms
 
-**Optimization Benefits:**
-- **Knowledge-distilled kernels**: Enable compact yet powerful architecture
-- **Batch processing**: Linear scaling up to 32 samples
-- **Production ready**: Sub-4ms inference suitable for real-time trading
+**Cross-Platform Scalability:**
+- **Consistent accuracy**: 82.5% validation accuracy across all hardware configurations
+- **Hardware adaptability**: 4.1x performance scaling from laptop to data center GPU
+- **Production flexibility**: Sub-2ms inference on enterprise hardware enables ultra-high-frequency trading
 
 ---
 
