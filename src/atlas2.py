@@ -28,8 +28,16 @@ from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
+USING_NPU = False
+try:
+    import torch_npu
+    print("Successfully imported torch_npu")
+    USING_NPU = True
+except ImportError:
+    pass
+
 # Import user-provided data processing module
-import data  # User-provided data processing module
+import src.data  # User-provided data processing module
 
 mpl.rcParams["font.sans-serif"] = ["DejaVu Sans", "Arial", "sans-serif"]
 mpl.rcParams["axes.unicode_minus"] = False
@@ -39,9 +47,13 @@ np.random.seed(42)
 torch.manual_seed(42)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(42)
+elif torch.npu.is_available():
+    torch.npu.manual_seed_all(42)
 
 # Set device
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if USING_NPU:
+    device = torch.device("npu" if torch.npu.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Ignore warnings
