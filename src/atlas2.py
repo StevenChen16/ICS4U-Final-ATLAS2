@@ -38,6 +38,7 @@ except ImportError:
 
 # Import user-provided data processing module
 from src.data import load_data_from_csv  # User-provided data processing module
+from src.auto_tuning import get_auto_config  # Auto-tuning module
 
 mpl.rcParams["font.sans-serif"] = ["DejaVu Sans", "Arial", "sans-serif"]
 mpl.rcParams["axes.unicode_minus"] = False
@@ -1232,6 +1233,7 @@ def run_atlas_binary_pipeline(
     validation_size=0.2,
     gap_size=10,
     threshold=0.5,
+    enable_auto_tuning=False,
 ):
     """
     运行ATLAS二元分类流程
@@ -1250,6 +1252,7 @@ def run_atlas_binary_pipeline(
     validation_size (float): 验证集比例
     gap_size (int): 训练和测试集间隔
     threshold (float): 价格变动阈值，用于标签生成
+    enable_auto_tuning (bool): 是否启用自动调参（类似nnUNet）
 
     返回:
     tuple: (训练好的模型, 测试数据)
@@ -1257,6 +1260,48 @@ def run_atlas_binary_pipeline(
     # 确保输出目录存在
     os.makedirs("models", exist_ok=True)
     os.makedirs("results", exist_ok=True)
+
+    # === Auto-Tuning Integration ===
+    if enable_auto_tuning:
+        print("\n🚀 ATLAS Auto-Tuning Enabled (nnUNet-like)")
+        print("=" * 50)
+        
+        try:
+            # Get auto-tuned configuration
+            auto_config = get_auto_config(ticker_list, data_dir)
+            
+            # Override parameters with auto-tuned values
+            print("📊 Auto-tuned parameters:")
+            for key, value in auto_config.items():
+                if key in locals():
+                    old_value = locals()[key]
+                    if old_value != value:
+                        print(f"  {key}: {old_value} → {value}")
+                    else:
+                        print(f"  {key}: {value} (unchanged)")
+                    locals()[key] = value
+            
+            # Update variables in current scope
+            window_size = auto_config['window_size']
+            stride = auto_config['stride']
+            threshold = auto_config['threshold']
+            image_size = auto_config['image_size']
+            batch_size = auto_config['batch_size']
+            learning_rate = auto_config['learning_rate']
+            epochs = auto_config['epochs']
+            patience = auto_config['patience']
+            validation_size = auto_config['validation_size']
+            gap_size = auto_config['gap_size']
+            use_specialized_kernels = auto_config['use_specialized_kernels']
+            
+            print("✅ Auto-tuning completed!")
+            print("=" * 50)
+            
+        except Exception as e:
+            print(f"⚠️ Auto-tuning failed: {str(e)}")
+            print("📋 Using manual parameters...")
+    else:
+        print("📋 Using manual parameters (auto-tuning disabled)")
 
     # 步骤1: 加载和处理数据
     all_windows = []
@@ -1518,6 +1563,45 @@ def run_atlas_binary_pipeline(
     return model, (X_test, y_test, test_indices, test_probs)
 
 
+def demo_auto_tuning():
+    """
+    Demo function showing auto-tuning vs manual configuration
+    """
+    print("=" * 60)
+    print("ATLAS Auto-Tuning Demo (nnUNet-inspired)")
+    print("=" * 60)
+    
+    # Small test with a few tickers
+    test_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+    
+    print("\n🔍 Demo 1: Manual Configuration")
+    print("-" * 30)
+    model1, _ = run_atlas_binary_pipeline(
+        ticker_list=test_tickers,
+        data_dir="data_short",
+        window_size=50,
+        stride=10,
+        batch_size=32,
+        learning_rate=0.001,
+        epochs=10,  # Short for demo
+        enable_auto_tuning=False,
+    )
+    
+    print("\n🤖 Demo 2: Auto-Tuned Configuration (nnUNet-style)")
+    print("-" * 30)
+    model2, _ = run_atlas_binary_pipeline(
+        ticker_list=test_tickers,
+        data_dir="data_short",
+        epochs=10,  # Short for demo
+        enable_auto_tuning=True,  # 🎆 Magic happens here!
+    )
+    
+    print("\n✅ Demo completed! Check the differences in configuration.")
+    print("\n📝 Note: Auto-tuning analyzes your data characteristics and")
+    print("automatically adjusts parameters like window_size, batch_size, learning_rate, etc.")
+    print("Just like nnUNet does for medical images, but adapted for financial time series!")
+
+
 def main():
     """
     主函数
@@ -1643,6 +1727,9 @@ def main():
     # ticker_list = ['000001.SS', 'AAPL', 'ABBV', 'ABT', 'ADBE', 'AIG', 'ALB', 'ALL', 'AMAT', 'AMD', 'AMGN', 'AMT', 'AMZN', 'APA', 'APD', 'ARE', 'ARKK', 'AVB', 'AXP', 'BA', 'BABA', 'BAC', 'BIDU', 'BIIB', 'BILI', 'BK', 'BKR', 'BLK', 'BMY', 'BXP', 'C', 'CAT', 'CCI', 'CE', 'CF', 'CI', 'CL', 'CMCSA', 'CMI', 'COF', 'COP', 'COST', 'CRM', 'CSCO', 'CVS', 'CVX', 'DD', 'DE', 'DHR', 'DIA', 'DIS', 'DLR', 'DOW', 'DVN', 'ECL', 'EEM', 'EL', 'EMN', 'EMR', 'EOG', 'EP', 'EQIX', 'EQR', 'ESS', 'ETN', 'FANG', 'FCX', 'FDX', 'FMC', 'GD', 'GDX', 'GE', 'GILD', 'GIS', 'GOOGL', 'GOTU', 'GS', 'HAL', 'HD', 'HES', 'HON', 'HST', 'HUM', 'HYG', 'IBM', 'IEMG', 'IFF', 'INTC', 'IQ', 'IR', 'ISRG', 'IVV', 'IWM', 'JD', 'JNJ', 'JPM', 'K', 'KIM', 'KMB', 'KMI', 'KO', 'LI', 'LIN', 'LLY', 'LMT', 'LOW', 'MA', 'MAA', 'MCD', 'MET', 'META', 'MLM', 'MMM', 'MOS', 'MPC', 'MRK', 'MRO', 'MS', 'MSFT', 'MU', 'NEM', 'NFLX', 'NIO', 'NKE', 'NOW', 'NSC', 'NUE', 'NVDA', 'O', 'ORCL', 'OXY', 'PDD', 'PEP', 'PFE', 'PG', 'PH', 'PLD', 'PNC', 'PPG', 'PRU', 'PSA', 'PSX', 'QCOM', 'QQQ', 'REG', 'REGN', 'ROK', 'RTX', 'SBUX', 'SCHW', 'SEE', 'SHW', 'SLB', 'SNOW', 'SPG', 'SPY', 'T', 'TFC', 'TGT', 'TLT', 'TME', 'TMO', 'TSLA', 'UDR', 'UNH', 'UNP', 'UPS', 'USB', 'USO', 'V', 'VLO', 'VMC', 'VNQ', 'VOO', 'VRTX', 'VTI', 'VTR', 'VZ', 'WELL', 'WFC', 'WM', 'WMB', 'WMT', 'XLE', 'XLF', 'XLK', 'XLP', 'XLY', 'XOM', 'XPEV', 'ZTS', '^DJI', '^FTSE', '^GDAXI', '^GSPC', '^HSI', '^IXIC', '^NDX', '^RUT', '^VIX']
 
     # 运行完整流程
+    print("\n🎆 Demo: ATLAS with Auto-Tuning (nnUNet-style)")
+    print("📝 Set enable_auto_tuning=True to use data-driven parameter optimization")
+    
     model, test_data = run_atlas_binary_pipeline(
         ticker_list=ticker_list,
         data_dir="data",  # 数据目录
@@ -1657,10 +1744,15 @@ def main():
         validation_size=0.2,
         gap_size=20,  # 训练和测试集间隔
         threshold=0.5,  # 标签生成阈值
+        enable_auto_tuning=True,  # 🎆 Enable nnUNet-like auto-tuning!
     )
 
     print("\n完成!")
 
 
 if __name__ == "__main__":
+    # Uncomment the line below to run auto-tuning demo
+    # demo_auto_tuning()
+    
+    # Run full pipeline with auto-tuning enabled
     main()
