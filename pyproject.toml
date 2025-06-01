@@ -7,14 +7,47 @@ name = "atlas-stock-analysis"
 version = "0.1.0"
 description = "AI-Powered Stock Market Pattern Recognition using Knowledge-Distilled CNN"
 readme = "README.md"
+license = {file = "LICENSE"}
 authors = [
     { name = "Steven Chen", email = "i@stevenchen.site" }
 ]
+keywords = ["AI", "stock-market", "CNN", "financial-analysis", "deep-learning"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.21.0,<2.0.0",
+    "pandas>=1.3.0",
+    "torch>=2.1.0",
+    "torchvision>=0.16.0",
+    "scikit-learn>=1.0.0",
+    "yfinance>=0.1.70",
+    "plotly>=5.0.0",
+    "dash>=2.0.0",
+    "dash-bootstrap-components>=1.0.0",
+]
 
 [project.optional-dependencies]
-dev = ["pytest", "black", "flake8"]
+dev = ["pytest>=6.0", "black>=22.0", "flake8>=4.0", "mypy>=0.900"]
 gpu = ["GPUtil>=1.4.0"]
+full = ["atlas-stock-analysis[dev,gpu]"]
 
 [project.scripts]
 atlas = "main:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
