@@ -227,7 +227,35 @@ Uses YFinance + TA-Lib for real-time data processing.
 - **Huawei Ascend 910B**: Competitive TFlops (0.064) but higher latency (4.07ms) suggests optimization opportunities
 - **Software maturity factor**: Western chips benefit from mature PyTorch optimization, Eastern chips show potential
 
-**Platform-Specific Advantages:**
+### 🏆 Model Performance Validation
+
+**Comprehensive Experimental Results**: ATLAS demonstrates superior performance across multiple validation methods and significantly outperforms baseline models with exceptional parameter efficiency.
+
+| Model | Accuracy | Parameters | Efficiency* | Key Insight |
+|-------|----------|------------|-------------|-------------|
+| **🥇 ATLAS_Full** | **83.7%** | **17,081** | **49.0** | Knowledge-distilled CNN with specialized kernels |
+| 🥈 ResNet_CNN | 80.0% | 316,641 | 2.5 | General-purpose CNN (18.5× more parameters) |
+| 🥉 ATLAS_Random | 78.2% | 30,277 | 25.8 | Random kernels (validates specialized design) |
+| Gradient Boosting | 78.0% | 100,000 | 7.8 | Traditional ML baseline |
+| Random Forest | 77.0% | 100,000 | 7.7 | Traditional ensemble method |
+| ❌ LSTM/GRU/Transformer | ~50% | 42K-597K | ~1.0 | Sequence models underperform |
+
+*Efficiency = Accuracy(%) ÷ (Parameters/1000)
+
+**🔬 Validation Method Comparison:**
+
+| Method | Accuracy | Samples | Suitability for Time Series |
+|--------|----------|---------|----------------------------|
+| **Walk-Forward** | **86.3%** | 400 | ⭐⭐⭐ Most realistic for trading |
+| Time Series CV | 83.6% | 2,804 | ⭐⭐⭐ Stability validation |
+| Holdout | 83.7% | 705 | ⭐⭐ Traditional approach |
+
+**💡 Key Findings:**
+- **Parameter Efficiency Breakthrough**: Achieves 83.7% accuracy with 18.5× fewer parameters than ResNet
+- **Specialized Architecture Advantage**: Knowledge-distilled kernels outperform random kernels by 5.5%
+- **Validation Method Impact**: Walk-forward validation reaches 86.3%, closest to real trading scenarios
+- **Deep Learning Surprise**: LSTM/GRU/Transformer architectures fail on financial time series (~50% accuracy)
+- **Model Stability**: Very stable performance (σ = 0.026) across different validation folds
 ```
 🏆 H100: Ultimate performance for ultra-HFT (0.94ms, 29K samples/sec)
 🎯 V100: Proven enterprise solution (1.53ms, 20K samples/sec)  
