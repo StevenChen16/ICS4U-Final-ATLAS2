@@ -14,7 +14,7 @@ ATLAS is an innovative **AI-powered stock market prediction system** that combin
 
 ### 🔬 Core Innovation: Knowledge Distillation from Human Expertise
 
-Traditional CNNs struggle to learn financial chart patterns effectively. Our solution implements **knowledge distillation** by encoding human trading expertise directly into specialized convolution kernels, achieving **82.5% validation accuracy** with only **17,577 parameters**.
+Traditional CNNs struggle to learn financial chart patterns effectively. Our solution implements **knowledge distillation** by encoding human trading expertise directly into specialized convolution kernels, achieving **83.4% validation accuracy** with only **17,577 parameters**.
 
 ---
 
@@ -116,7 +116,7 @@ Uses YFinance + TA-Lib for real-time data processing.
 
 | Metric | **H100 (80GB)** | **V100 (32GB)** | **Kaggle GPU** | **Ascend 910B** | **RTX 4060 Laptop** | **CPU (Ryzen 7 7840H)** |
 |--------|------------------|------------------|-----------------|------------------|---------------------|-------------------------|
-| **Validation Accuracy** | **82.5%** | **82.5%** | **82.5%** | **82.5%** | **82.5%** | **82.5%** |
+| **Validation Accuracy** | **83.4%** | **83.4%** | **83.4%** | **83.4%** | **83.4%** | **83.4%** |
 | **Model Parameters** | **17,081** | **17,081** | **17,081** | **17,081** | **17,081** | **17,081** |
 | **Model Size** | **0.07 MB** | **0.07 MB** | **0.07 MB** | **0.07 MB** | **0.07 MB** | **0.07 MB** |
 | **Peak Performance** | **🚀 0.261 TFlops** | **0.182 TFlops** | **0.111 TFlops** | **0.064 TFlops** | **0.044 TFlops** | **0.010 TFlops** |
@@ -141,7 +141,7 @@ Uses YFinance + TA-Lib for real-time data processing.
 - **15x throughput scaling**: 1,957 samples/sec (CPU) to 29,269 samples/sec (H100)
 
 **Cross-Platform & Cross-Vendor Universality:**
-- **Consistent accuracy**: 82.5% maintained across NVIDIA, Huawei, AMD, and Intel hardware
+- **Consistent accuracy**: 83.4% maintained across NVIDIA, Huawei, AMD, and Intel hardware
 - **Vendor agnostic**: Excellent performance on both Western (NVIDIA) and Chinese (Huawei) AI chips
 - **Future-proof design**: Ready for current and next-generation hardware ecosystems### 🌟 Hardware Ecosystem Insights
 
