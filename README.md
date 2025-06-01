@@ -47,6 +47,42 @@ Input (50×50×4) → [GASF|GADF|RP|MTF Branches] → Feature Fusion → Binary 
 
 ---
 
+## 📊 Dataset
+
+### 🗂️ Data Sources & Setup
+
+ATLAS supports two methods for obtaining training data:
+
+#### **Option 1: Pre-processed Dataset (Recommended)**
+```bash
+# Install Kaggle API
+pip install kaggle
+
+# Setup Kaggle credentials (one-time)
+# 1. Get API token from https://www.kaggle.com/settings/account
+# 2. Place kaggle.json in ~/.kaggle/
+mkdir -p ~/.kaggle && chmod 600 ~/.kaggle/kaggle.json
+
+# Download dataset
+kaggle datasets download -d stevenchen116/us-stock-collect-data
+unzip us-stock-collect-data.zip -d data/
+```
+
+**📦 Dataset Features:**
+- **200 US stocks** (S&P 500, FAANG, Blue chips)
+- **44 years** of data (1980-2023) 
+- **OHLCV + 14 technical indicators** pre-calculated
+- **~500MB** compressed size
+
+#### **Option 2: Generate Fresh Data**
+```bash
+# Auto-download and process latest data
+python data.py
+```
+Uses YFinance + TA-Lib for real-time data processing.
+
+---
+
 ## 📊 System Architecture
 
 ### Core Components:
