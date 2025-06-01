@@ -73,36 +73,36 @@ Input (50×50×4) → [GASF|GADF|RP|MTF Branches] → Feature Fusion → Binary 
 
 ## 🎯 Key Results
 
-| Metric | Tesla V100 (32GB) | Tesla P100(16G) | RTX 4060 Laptop |
-|--------|-------------|------------|------------------|
-| **Validation Accuracy** | **82.5%** | **82.5%** | **82.5%** |
-| **Model Parameters** | **17,081** | **17,081** | **17,081** |
-| **Model Size** | **0.07 MB** | **0.07 MB** | **0.07 MB** |
-| **Peak Performance** | **0.182 TFlops** | **0.111 TFlops** | **0.044 TFlops** |
-| **Max Throughput** | **20,415 samples/sec** | **12,505 samples/sec** | **8,362 samples/sec** |
-| **Min Latency** | **1.53 ms** | **2.23 ms** | **3.32 ms** |
-| **Memory Efficient** | **< 0.1 MB GPU memory** | **< 0.1 MB GPU memory** | **< 0.1 MB GPU memory** |
-| **Optimal Batch Size** | **32 (TFlops) / 8 (balanced)** | **32 (TFlops) / 8 (balanced)** | **32 (TFlops) / 8 (balanced)** |
-| **Torch.Compile Speedup** | **0.97x** | **0.98x** | **N/A** |
-| **Batch Scaling** | **31.8x (BS1→BS32)** | **27.9x (BS1→BS32)** | **38.8x (BS1→BS32)** |
+| Metric | V100 (32GB) | Kaggle GPU | RTX 4060 Laptop | **CPU (Ryzen 7 7840H)** |
+|--------|-------------|------------|------------------|-------------------------|
+| **Validation Accuracy** | **82.5%** | **82.5%** | **82.5%** | **82.5%** |
+| **Model Parameters** | **17,081** | **17,081** | **17,081** | **17,081** |
+| **Model Size** | **0.07 MB** | **0.07 MB** | **0.07 MB** | **0.07 MB** |
+| **Peak Performance** | **0.182 TFlops** | **0.111 TFlops** | **0.044 TFlops** | **0.010 TFlops** |
+| **Max Throughput** | **20,415 samples/sec** | **12,505 samples/sec** | **8,362 samples/sec** | **1,957 samples/sec** |
+| **Min Latency** | **1.53 ms** | **2.23 ms** | **3.32 ms** | **3.40 ms** |
+| **Memory Efficient** | **< 0.1 MB GPU memory** | **< 0.1 MB GPU memory** | **< 0.1 MB GPU memory** | **< 0.1 MB RAM** |
+| **Optimal Batch Size** | **32 (TFlops) / 8 (balanced)** | **32 (TFlops) / 8 (balanced)** | **32 (TFlops) / 8 (balanced)** | **32 (TFlops) / 8 (balanced)** |
+| **Torch.Compile Speedup** | **0.97x** | **0.98x** | **N/A** | **0.95x** |
+| **Batch Scaling** | **31.8x (BS1→BS32)** | **27.9x (BS1→BS32)** | **38.8x (BS1→BS32)** | **6.6x (BS1→BS32)** |
+| **Hardware Type** | **Data Center GPU** | **Cloud GPU** | **Consumer GPU** | **Consumer CPU** |
 
 ### 🔥 Performance Analysis
 
 **Computational Efficiency:**
-- Achieves **0.182 TFlops** peak performance on V100 (4.1x improvement over laptop, 64% over Kaggle)
-- **Excellent parameter efficiency**: 10.66 GFlops per 1K parameters (V100) vs 6.50 (Kaggle) vs 2.58 (laptop)
-- **Linear scalability**: Performance scales consistently with GPU compute capability
+- **GPU advantage**: 18.2x TFlops improvement from CPU to V100
+- **Excellent parameter efficiency**: 10.66 GFlops per 1K parameters (V100) down to 0.59 (CPU)
+- **Broad deployment spectrum**: From enterprise GPU to commodity CPU support
 
 **Real-time Capabilities:**
-- **Ultra-low latency**: 1.53ms minimum inference time on V100 (54% faster than laptop, 31% faster than Kaggle)
-- **High throughput**: 20,415 samples/sec peak processing (144% improvement over laptop, 63% over Kaggle)
-- **Memory efficient**: Negligible GPU memory footprint across all platforms
+- **Ultra-low latency**: 1.53ms (V100) to 3.40ms (CPU) - all under 4ms threshold
+- **Scalable throughput**: 20,415 samples/sec (V100) to 1,957 samples/sec (CPU)
+- **Universal deployment**: CPU performance still enables real-time trading applications
 
-**Cross-Platform Scalability:**
-- **Consistent accuracy**: 82.5% validation accuracy across all hardware configurations
-- **Hardware adaptability**: 4.1x performance scaling from laptop to data center GPU
-- **Production flexibility**: Sub-2ms inference on enterprise hardware enables ultra-high-frequency trading
-
+**Cross-Platform Universality:**
+- **Consistent accuracy**: 82.5% across all hardware configurations
+- **18.2x performance scaling**: From CPU to data center GPU
+- **Sub-4ms inference**: Even CPU deployment supports low-latency trading
 ---
 
 ## 🛠️ Technical Implementation

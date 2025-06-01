@@ -15,139 +15,20 @@ import psutil
 import GPUtil
 from contextlib import contextmanager
 import warnings
+import sys
 warnings.filterwarnings("ignore")
 
 # 导入模型架构（需要从atlas2.py导入）
-try:
-    from ..atlas2 import ATLASModel, create_specialized_kernels
-    print("✅ Successfully imported ATLAS model")
-except ImportError:
-    print("❌ Cannot import ATLAS model, defining architecture locally...")
-    
-    # 如果无法导入，在此定义简化版本的模型架构
-    class AttentionBlock(nn.Module):
-        def __init__(self, in_channels):
-            super(AttentionBlock, self).__init__()
-            self.attention = nn.Sequential(
-                nn.Conv2d(in_channels, 1, kernel_size=1), nn.Sigmoid()
-            )
-
-        def forward(self, x):
-            attention_weights = self.attention(x)
-            return x * attention_weights
-
-    class SingleBranchCNN(nn.Module):
-        def __init__(self, in_channels=1, kernel_weights=None):
-            super(SingleBranchCNN, self).__init__()
-            
-            if kernel_weights is not None:
-                num_kernels = len(kernel_weights)
-                self.conv1 = nn.Conv2d(in_channels, num_kernels, kernel_size=5, padding=2)
-                kernel_tensor = torch.FloatTensor(np.array(kernel_weights)).unsqueeze(1)
-                self.conv1.weight.data = kernel_tensor
-                self.conv1.bias.data.fill_(0.0)
-            else:
-                self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=3, padding=1)
-
-            self.bn1 = nn.BatchNorm2d(self.conv1.out_channels)
-            self.relu = nn.ReLU()
-            self.pool = nn.MaxPool2d(2)
-            self.conv2 = nn.Conv2d(self.conv1.out_channels, 32, kernel_size=3, padding=1)
-            self.bn2 = nn.BatchNorm2d(32)
-            self.attention = AttentionBlock(32)
-
-        def forward(self, x):
-            x = self.conv1(x)
-            x = self.bn1(x)
-            x = self.relu(x)
-            x = self.pool(x)
-            x = self.conv2(x)
-            x = self.bn2(x)
-            x = self.relu(x)
-            x = self.attention(x)
-            x = self.pool(x)
-            return x
-
-    class ATLASModel(nn.Module):
-        def __init__(self, input_shape=(50, 50, 4), kernels=None, dropout_rate=0.5):
-            super(ATLASModel, self).__init__()
-            
-            height, width, channels = input_shape
-            self.use_specialized_kernels = kernels is not None
-            
-            if self.use_specialized_kernels:
-                self.gasf_branch = SingleBranchCNN(in_channels=1, kernel_weights=kernels["gasf"])
-                self.gadf_branch = SingleBranchCNN(in_channels=1, kernel_weights=kernels["gadf"])
-                self.rp_branch = SingleBranchCNN(in_channels=1, kernel_weights=kernels["rp"])
-                self.mtf_branch = SingleBranchCNN(in_channels=1, kernel_weights=kernels["mtf"])
-            else:
-                self.gasf_branch = SingleBranchCNN(in_channels=1)
-                self.gadf_branch = SingleBranchCNN(in_channels=1)
-                self.rp_branch = SingleBranchCNN(in_channels=1)
-                self.mtf_branch = SingleBranchCNN(in_channels=1)
-
-            self.global_pool = nn.AdaptiveAvgPool2d(1)
-            fusion_input_size = 32 * 4
-
-            self.classifier = nn.Sequential(
-                nn.Linear(fusion_input_size, 64),
-                nn.BatchNorm1d(64),
-                nn.ReLU(),
-                nn.Dropout(dropout_rate),
-                nn.Linear(64, 32),
-                nn.BatchNorm1d(32),
-                nn.ReLU(),
-                nn.Dropout(dropout_rate / 2),
-                nn.Linear(32, 1),
-                nn.Sigmoid(),
-            )
-
-        def forward(self, x):
-            batch_size = x.size(0)
-            
-            gasf_input = x[:, 0:1, :, :]
-            gadf_input = x[:, 1:2, :, :]
-            rp_input = x[:, 2:3, :, :]
-            mtf_input = x[:, 3:4, :, :]
-
-            gasf_features = self.gasf_branch(gasf_input)
-            gadf_features = self.gadf_branch(gadf_input)
-            rp_features = self.rp_branch(rp_input)
-            mtf_features = self.mtf_branch(mtf_input)
-
-            gasf_features = self.global_pool(gasf_features).view(batch_size, -1)
-            gadf_features = self.global_pool(gadf_features).view(batch_size, -1)
-            rp_features = self.global_pool(rp_features).view(batch_size, -1)
-            mtf_features = self.global_pool(mtf_features).view(batch_size, -1)
-
-            combined = torch.cat([gasf_features, gadf_features, rp_features, mtf_features], dim=1)
-            output = self.classifier(combined)
-            return output
-
-    def create_specialized_kernels():
-        # 简化版本的专业卷积核
-        uptrend_kernel = np.array([
-            [-2.0, -1.5, -1.0, 0.0, 2.0],
-            [-1.5, -1.0, 0.0, 1.5, 3.0],
-            [-1.0, 0.0, 2.0, 3.5, 4.0],
-            [0.0, 1.5, 3.5, 4.5, 5.0],
-            [2.0, 3.0, 4.0, 5.0, 6.0],
-        ])
-        
-        return {
-            "gasf": [uptrend_kernel] * 9,
-            "gadf": [uptrend_kernel] * 4,
-            "rp": [uptrend_kernel] * 3,
-            "mtf": [uptrend_kernel] * 3,
-        }
-
+from src.atlas2 import ATLASModel, create_specialized_kernels
+print("✅ Successfully imported ATLAS model")
 
 class PerformanceBenchmark:
     """ATLAS模型性能基准测试类"""
     
-    def __init__(self, model_path: str = "models/atlas_binary_model_best.pth"):
+    def __init__(self, model_path: str = "../models/atlas_binary_model_best.pth"):
         self.model_path = model_path
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # self.device = torch.device("cpu")
         self.model = None
         self.compiled_model = None
         
