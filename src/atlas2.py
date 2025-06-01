@@ -37,7 +37,7 @@ except ImportError:
     pass
 
 # Import user-provided data processing module
-import src.data  # User-provided data processing module
+from src.data import load_data_from_csv  # User-provided data processing module
 
 mpl.rcParams["font.sans-serif"] = ["DejaVu Sans", "Arial", "sans-serif"]
 mpl.rcParams["axes.unicode_minus"] = False
@@ -80,7 +80,7 @@ def load_ticker_data(ticker, data_dir="data_short", start_idx=None, end_idx=None
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Cannot find data file for {ticker}: {file_path}")
 
-    df = data.load_data_from_csv(file_path)
+    df = load_data_from_csv(file_path)
 
     # Select specific range of data (if specified)
     if start_idx is not None and end_idx is not None:
