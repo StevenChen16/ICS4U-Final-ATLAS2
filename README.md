@@ -54,6 +54,7 @@ Input (50×50×4) → [GASF|GADF|RP|MTF Branches] → Feature Fusion → Binary 
 ATLAS supports two methods for obtaining training data:
 
 #### **Option 1: Pre-processed Dataset (Recommended)**
+##### a.using api
 ```bash
 # Install Kaggle API
 pip install kaggle
@@ -67,6 +68,10 @@ mkdir -p ~/.kaggle && chmod 600 ~/.kaggle/kaggle.json
 kaggle datasets download -d stevenchen116/us-stock-collect-data
 unzip us-stock-collect-data.zip -d data/
 ```
+##### b.download through browser
+Homepage of dataset: [kaggle dataset](https://www.kaggle.com/datasets/stevenchen116/us-stock-collect-data/)
+
+Download zip: [US-Stock-Collect-Data.zip](https://www.kaggle.com/api/v1/datasets/download/stevenchen116/us-stock-collect-data)
 
 **📦 Dataset Features:**
 - **200 US stocks** (S&P 500, FAANG, Blue chips)
