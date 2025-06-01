@@ -58,18 +58,6 @@ model = run_atlas_binary_pipeline(
     # All parameters automatically optimized based on market characteristics
 )
 ```
-
-### 📊 Auto-Tuning Performance Validation
-
-| **Market Type** | **Manual Config** | **Auto-Tuned** | **Improvement** |
-|----------------|------------------|----------------|----------------|
-| **Tech Stocks** | 78.2% | 83.4% | **+5.2%** |
-| **Energy** | 73.4% | 80.2% | **+6.8%** |
-| **Healthcare** | 79.1% | 82.7% | **+3.6%** |
-| **Finance** | 75.8% | 81.1% | **+5.3%** |
-
-**🎯 Key Innovation**: Just as nnU-Net eliminated manual architecture tuning in medical AI, ATLAS Auto-Tuning eliminates manual hyperparameter optimization in financial AI.
-
 ---
 
 ## 🚀 Technical Highlights
