@@ -18,6 +18,13 @@ import warnings
 import sys
 warnings.filterwarnings("ignore")
 
+USING_NPU = False
+try:
+    import torch_npu
+    USING_NPU = True
+except ImportError:
+    pass
+
 # 导入模型架构（需要从atlas2.py导入）
 from src.atlas2 import ATLASModel, create_specialized_kernels
 print("✅ Successfully imported ATLAS model")
@@ -28,6 +35,8 @@ class PerformanceBenchmark:
     def __init__(self, model_path: str = "../models/atlas_binary_model_best.pth"):
         self.model_path = model_path
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if USING_NPU:
+            self.device = torch.device("npu" if torch.npu.is_available() else "cpu")
         # self.device = torch.device("cpu")
         self.model = None
         self.compiled_model = None
@@ -39,6 +48,9 @@ class PerformanceBenchmark:
         if torch.cuda.is_available():
             print(f"🎮 GPU: {torch.cuda.get_device_name()}")
             print(f"💾 GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        elif torch.npu.is_available():
+            print(f"🎮 NPU: {torch.npu.get_device_name()}")
+            print(f"💾 NPU Memory: {torch.npu.get_device_properties(0).total_memory / 1e9:.1f} GB")
         
     def load_model(self) -> None:
         """加载模型"""
@@ -140,10 +152,14 @@ class PerformanceBenchmark:
         """计时器上下文管理器"""
         if torch.cuda.is_available():
             torch.cuda.synchronize()
+        elif torch.npu.is_available():
+            torch.npu.synchronize()
         start = time.perf_counter()
         yield
         if torch.cuda.is_available():
             torch.cuda.synchronize()
+        elif torch.npu.is_available():
+            torch.npu.synchronize()
         end = time.perf_counter()
         self.elapsed_time = end - start
 
@@ -158,6 +174,8 @@ class PerformanceBenchmark:
                 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        elif torch.npu.is_available():
+            torch.npu.empty_cache()
         print("✅ Warmup completed")
 
     def benchmark_inference(
@@ -204,6 +222,8 @@ class PerformanceBenchmark:
                     # 记录GPU使用情况（如果可用）
                     if torch.cuda.is_available() and i == 0:
                         gpu_before = torch.cuda.memory_allocated() / 1024 / 1024  # MB
+                    if torch.npu.is_available() and i == 0:
+                        gpu_before = torch.npu.memory_allocated() / 1024 / 1024
                     
                     # 计时推理
                     with self.timer():
@@ -213,6 +233,9 @@ class PerformanceBenchmark:
                     
                     if i == 0 and torch.cuda.is_available():
                         gpu_after = torch.cuda.memory_allocated() / 1024 / 1024  # MB
+                        memory_usage = gpu_after - gpu_before
+                    if i == 0 and torch.npu.is_available():
+                        gpu_after = torch.npu.memory_allocated() / 1024 / 1024
                         memory_usage = gpu_after - gpu_before
                     
                     # 进度显示
@@ -235,6 +258,13 @@ class PerformanceBenchmark:
                         gpu_util = gpus[0].load * 100
                 except:
                     gpu_util = 0
+            elif torch.npu.is_available():
+                try:
+                    gpus = GPUtil.getGPUs()
+                    if gpus:
+                        gpu_util = gpus[0].load * 100
+                except:
+                    gpu_util = 0
             
             # 存储结果
             results['batch_sizes'].append(batch_size)
@@ -243,17 +273,29 @@ class PerformanceBenchmark:
             results['theoretical_tflops'].append(theoretical_flops / 1e12)
             results['actual_tflops'].append(actual_tflops)
             results['gpu_utilization'].append(gpu_util)
-            results['memory_usage_mb'].append(memory_usage if torch.cuda.is_available() else 0)
+            if torch.cuda.is_available():
+                results['memory_usage_mb'].append(memory_usage)
+            elif torch.npu.is_available():
+                results['memory_usage_mb'].append(memory_usage)
+            else:
+                results['memory_usage_mb'].append(0.0)
             
             # 打印结果
             print(f"   ⏱️  Avg Latency: {avg_latency:.2f} ± {std_latency:.2f} ms")
             print(f"   🚀 Throughput: {throughput:.1f} samples/sec")
             print(f"   ⚡ TFlops: {actual_tflops:.3f}")
-            print(f"   💾 Memory: {memory_usage if torch.cuda.is_available() else 0:.1f} MB")
+            if torch.cuda.is_available():
+                print(f"   💾 Memory: {memory_usage:.1f} MB")
+            elif torch.npu.is_available():
+                print(f"   💾 Memory: {memory_usage:.1f} MB")
+            else:
+                print(f"   💾 Memory: 0.0 MB")
             
             # 清理内存
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            elif torch.npu.is_available():
+                torch.npu.empty_cache()
             gc.collect()
         
         return results
@@ -343,6 +385,11 @@ class PerformanceBenchmark:
             axes[1, 0].set_ylabel('Memory Usage (MB)')
             axes[1, 0].set_title('GPU Memory Usage')
             axes[1, 0].grid(True, alpha=0.3)
+        elif torch.npu.is_available():
+            axes[1, 0].bar(results['batch_sizes'], results['memory_usage_mb'], color='purple', alpha=0.7)
+            axes[1, 0].set_xlabel('Batch Size')
+            axes[1, 0].set_ylabel('Memory Usage (MB)')
+            axes[1, 0].set_title('NPU Memory Usage')
         else:
             axes[1, 0].text(0.5, 0.5, 'GPU not available', ha='center', va='center', transform=axes[1, 0].transAxes)
             axes[1, 0].set_title('GPU Memory Usage')
