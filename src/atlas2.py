@@ -630,7 +630,7 @@ class SingleBranchCNN(nn.Module):
 
 
 class ATLASModel(nn.Module):
-    """ATLAS模型: 多分支CNN用于金融二元分类"""
+    """ATLAS Model: Multi-branch CNN for Financial Binary Classification"""
 
     def __init__(self, input_shape=(50, 50, 4), kernels=None, dropout_rate=0.5):
         super(ATLASModel, self).__init__()
@@ -638,10 +638,10 @@ class ATLASModel(nn.Module):
         height, width, channels = input_shape
         assert channels == 4, "Input should have 4 channels"
 
-        # 分支
+        # Branches
         self.use_specialized_kernels = kernels is not None
 
-        # 各通道分支
+        # Each channel's branch
         if self.use_specialized_kernels:
             self.gasf_branch = SingleBranchCNN(
                 in_channels=1, kernel_weights=kernels["gasf"]
@@ -661,13 +661,13 @@ class ATLASModel(nn.Module):
             self.rp_branch = SingleBranchCNN(in_channels=1)
             self.mtf_branch = SingleBranchCNN(in_channels=1)
 
-        # 全局池化
+        # Global Pooling
         self.global_pool = nn.AdaptiveAvgPool2d(1)
 
-        # 计算融合特征维度
-        fusion_input_size = 32 * 4  # 4个分支，每个32个特征
+        # Calculate Fusion Feature Dimension
+        fusion_input_size = 32 * 4  # 4 branches, each with 32 features
 
-        # 分类器 - 二元分类只需要1个输出单元
+        # Classifier
         self.classifier = nn.Sequential(
             nn.Linear(fusion_input_size, 64),
             nn.BatchNorm1d(64),
@@ -677,13 +677,13 @@ class ATLASModel(nn.Module):
             nn.BatchNorm1d(32),
             nn.ReLU(),
             nn.Dropout(dropout_rate / 2),
-            nn.Linear(32, 1),  # 二元分类
-            nn.Sigmoid(),  # Sigmoid激活用于二元分类
+            nn.Linear(32, 1),  # Binary Classification
+            nn.Sigmoid(),  # Sigmoid Activation for Binary Classification
         )
 
     def forward(self, x):
-        # 分离每个通道
-        # 输入形状: [batch_size, channels, height, width]
+        # Separate each channel
+        # Input shape: [batch_size, channels, height, width]
         batch_size = x.size(0)
 
         gasf_input = x[:, 0:1, :, :]
@@ -691,30 +691,30 @@ class ATLASModel(nn.Module):
         rp_input = x[:, 2:3, :, :]
         mtf_input = x[:, 3:4, :, :]
 
-        # 处理每个分支
+        # Process each branch
         gasf_features = self.gasf_branch(gasf_input)
         gadf_features = self.gadf_branch(gadf_input)
         rp_features = self.rp_branch(rp_input)
         mtf_features = self.mtf_branch(mtf_input)
 
-        # 全局池化每个分支的特征
+        # Global Pooling each branch's features
         gasf_features = self.global_pool(gasf_features).view(batch_size, -1)
         gadf_features = self.global_pool(gadf_features).view(batch_size, -1)
         rp_features = self.global_pool(rp_features).view(batch_size, -1)
         mtf_features = self.global_pool(mtf_features).view(batch_size, -1)
 
-        # 特征融合
+        # Feature Fusion
         combined = torch.cat(
             [gasf_features, gadf_features, rp_features, mtf_features], dim=1
         )
 
-        # 分类
+        # Classification
         output = self.classifier(combined)
         return output
 
 
 # ----------------------------------------
-# 第5部分: 训练和评估函数
+# 5th part: Training and evaluation functions
 # ----------------------------------------
 
 
@@ -732,35 +732,35 @@ def train_model(
     last_model_save_path="models/atlas_binary_model_last.pth",
 ):
     """
-    训练二元分类模型
+    Train a binary classification model
 
-    参数:
-    model (nn.Module): PyTorch模型
-    train_loader (DataLoader): 训练数据加载器
-    val_loader (DataLoader): 验证数据加载器
-    criterion (nn.Module): 损失函数
-    optimizer (optim.Optimizer): 优化器
-    scheduler: 学习率调度器
-    num_epochs (int): 训练轮数
-    device (torch.device): 使用的设备
-    patience (int): 早停耐心值
-    best_model_save_path (str): 最佳模型保存路径
-    last_model_save_path (str): 最后一个模型保存路径
+    Parameters:
+    model (nn.Module): PyTorch model
+    train_loader (DataLoader): Training data loader
+    val_loader (DataLoader): Validation data loader
+    criterion (nn.Module): Loss function
+    optimizer (optim.Optimizer): Optimizer
+    scheduler: Learning rate scheduler
+    num_epochs (int): Number of epochs
+    device (torch.device): Device used
+    patience (int): Early stopping patience
+    best_model_save_path (str): Best model save path
+    last_model_save_path (str): Last model save path
 
-    返回:
-    dict: 训练历史记录
+    Returns:
+    dict: Training history
     """
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
     # Dropout
     model.dropout = nn.Dropout(0.5)
 
-    # 最佳模型保存
+    # Best model saving
     best_val_loss = float("inf")
     no_improve_epochs = 0
 
     for epoch in range(num_epochs):
-        # 训练阶段
+        # Training phase
         model.train()
         train_loss = 0.0
         train_correct = 0
@@ -771,18 +771,18 @@ def train_model(
         ):
             inputs, labels = inputs.to(device), labels.to(device)
 
-            # 梯度清零
+            # Gradient clearing
             optimizer.zero_grad()
 
-            # 前向传播
+            # Forward propagation
             outputs = model(inputs)
             loss = criterion(outputs, labels.float().view(-1, 1))
 
-            # 反向传播和优化
+            # Backpropagation and optimization
             loss.backward()
             optimizer.step()
 
-            # 统计
+            # Statistics
             train_loss += loss.item() * inputs.size(0)
             predicted = (outputs > 0.5).float()
             train_total += labels.size(0)
@@ -791,7 +791,7 @@ def train_model(
         train_loss = train_loss / train_total
         train_acc = train_correct / train_total
 
-        # 验证阶段
+        # Validation phase
         model.eval()
         val_loss = 0.0
         val_correct = 0
@@ -803,11 +803,11 @@ def train_model(
             ):
                 inputs, labels = inputs.to(device), labels.to(device)
 
-                # 前向传播
+                # Forward propagation
                 outputs = model(inputs)
                 loss = criterion(outputs, labels.float().view(-1, 1))
 
-                # 统计
+                # Statistics
                 val_loss += loss.item() * inputs.size(0)
                 predicted = (outputs > 0.5).float()
                 val_total += labels.size(0)
@@ -816,41 +816,41 @@ def train_model(
         val_loss = val_loss / val_total
         val_acc = val_correct / val_total
 
-        # 学习率调度
+        # Learning rate scheduling
         if scheduler:
             if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
                 scheduler.step(val_loss)
             else:
                 scheduler.step()
 
-        # 记录历史
+        # Record history
         history["train_loss"].append(train_loss)
         history["train_acc"].append(train_acc)
         history["val_loss"].append(val_loss)
         history["val_acc"].append(val_acc)
 
-        # 输出进度
+        # Print progress
         print(
             f"Epoch {epoch+1}/{num_epochs} | "
             f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} | "
             f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}"
         )
 
-        # 保存最佳模型
+        # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), best_model_save_path)
-            print(f"保存最佳模型, 验证损失: {val_loss:.4f}")
+            print(f"Save best model, validation loss: {val_loss:.4f}")
             no_improve_epochs = 0
         else:
             no_improve_epochs += 1
 
-        # 保存最后一个模型
+        # Save last model
         torch.save(model.state_dict(), last_model_save_path)
 
-        # 早停
+        # Early stopping
         if no_improve_epochs >= patience:
-            print(f"早停: {patience}轮未改善验证损失")
+            print(f"Early stopping: {patience} epochs without improving validation loss")
             break
 
     return history
@@ -858,16 +858,16 @@ def train_model(
 
 def evaluate_binary_model(model, test_loader, criterion, device=device):
     """
-    评估二元分类模型并生成详细指标
+    Evaluate binary classification model and generate detailed metrics
 
-    参数:
-    model (nn.Module): PyTorch模型
-    test_loader (DataLoader): 测试数据加载器
-    criterion (nn.Module): 损失函数
-    device (torch.device): 使用的设备
+    Parameters:
+    model (nn.Module): PyTorch model
+    test_loader (DataLoader): Test data loader
+    criterion (nn.Module): Loss function
+    device (torch.device): Device used
 
-    返回:
-    tuple: (测试损失, 测试准确率, 预测概率, 真实标签)
+    Returns:
+    tuple: (Test loss, Test accuracy, Predicted probabilities, True labels)
     """
     model.eval()
     test_loss = 0.0
@@ -878,38 +878,38 @@ def evaluate_binary_model(model, test_loader, criterion, device=device):
     all_labels = []
 
     with torch.no_grad():
-        for inputs, labels in tqdm(test_loader, desc="评估模型"):
+        for inputs, labels in tqdm(test_loader, desc="Evaluate model"):
             inputs, labels = inputs.to(device), labels.to(device)
 
-            # 前向传播
+            # Forward pass
             outputs = model(inputs)
             loss = criterion(outputs, labels.float().view(-1, 1))
 
-            # 统计
+            # Statistics
             test_loss += loss.item() * inputs.size(0)
             predicted = (outputs > 0.5).float()
             test_total += labels.size(0)
             test_correct += (predicted.view(-1) == labels).sum().item()
 
-            # 收集预测概率和标签
+            # Collect predicted probabilities and labels
             all_probs.extend(outputs.view(-1).cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
     test_loss = test_loss / test_total
     test_acc = test_correct / test_total
 
-    # 打印评估结果
-    print(f"测试损失: {test_loss:.4f}, 测试准确率: {test_acc:.4f}")
+    # Print evaluation results
+    print(f"Test loss: {test_loss:.4f}, Test accuracy: {test_acc:.4f}")
 
-    # 将概率和标签转换为numpy数组
+    # Convert probabilities and labels to numpy arrays
     all_probs = np.array(all_probs)
     all_labels = np.array(all_labels)
 
-    # 计算混淆矩阵
+    # Calculate confusion matrix
     predictions = (all_probs > 0.5).astype(int)
     cm = confusion_matrix(all_labels, predictions)
 
-    # 计算精确率、召回率等
+    # Calculate precision, recall, etc.
     tn, fp, fn, tp = cm.ravel()
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0
@@ -918,26 +918,26 @@ def evaluate_binary_model(model, test_loader, criterion, device=device):
         2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
     )
 
-    # 打印详细指标
-    print("\n二元分类指标:")
-    print(f"精确率 (Precision): {precision:.4f}")
-    print(f"召回率 (Recall): {recall:.4f}")
-    print(f"特异度 (Specificity): {specificity:.4f}")
-    print(f"F1分数: {f1:.4f}")
+    # Print detailed metrics
+    print("\nBinary classification metrics:")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"Specificity: {specificity:.4f}")
+    print(f"F1 score: {f1:.4f}")
 
-    # 绘制混淆矩阵
+    # Plot confusion matrix
     plt.figure(figsize=(8, 6))
     sns.heatmap(
         cm,
         annot=True,
         fmt="d",
         cmap="Blues",
-        xticklabels=["下跌", "上涨"],
-        yticklabels=["下跌", "上涨"],
+        xticklabels=["Down", "Up"],
+        yticklabels=["Down", "Up"],
     )
-    plt.xlabel("预测")
-    plt.ylabel("真实")
-    plt.title("混淆矩阵")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.title("Confusion Matrix")
     plt.savefig("results/binary_confusion_matrix.png")
     plt.show()
 
@@ -949,29 +949,29 @@ def evaluate_binary_model(model, test_loader, criterion, device=device):
 
 def plot_binary_metrics(true_labels, predicted_probs):
     """
-    绘制二元分类模型的ROC曲线和PR曲线
+    Plot binary classification model's ROC curve and PR curve
 
-    参数:
-    true_labels (numpy.ndarray): 真实标签
-    predicted_probs (numpy.ndarray): 预测概率
+    Parameters:
+    true_labels (numpy.ndarray): True labels
+    predicted_probs (numpy.ndarray): Predicted probabilities
     """
-    # ROC曲线
+    # ROC curve
     fpr, tpr, _ = roc_curve(true_labels, predicted_probs)
     roc_auc = auc(fpr, tpr)
 
     plt.figure(figsize=(12, 5))
 
     plt.subplot(1, 2, 1)
-    plt.plot(fpr, tpr, color="darkorange", lw=2, label=f"ROC曲线 (AUC = {roc_auc:.2f})")
+    plt.plot(fpr, tpr, color="darkorange", lw=2, label=f"ROC curve (AUC = {roc_auc:.2f})")
     plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel("假正率 (False Positive Rate)")
-    plt.ylabel("真正率 (True Positive Rate)")
-    plt.title("ROC曲线")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curve")
     plt.legend(loc="lower right")
 
-    # PR曲线
+    # PR curve
     precision, recall, _ = precision_recall_curve(true_labels, predicted_probs)
     avg_precision = average_precision_score(true_labels, predicted_probs)
 
@@ -981,19 +981,19 @@ def plot_binary_metrics(true_labels, predicted_probs):
         precision,
         color="blue",
         lw=2,
-        label=f"PR曲线 (AP = {avg_precision:.2f})",
+        label=f"PR curve (AP = {avg_precision:.2f})",
     )
     plt.axhline(
         y=sum(true_labels) / len(true_labels),
         color="red",
         linestyle="--",
-        label=f"基准 (正例比例 = {sum(true_labels)/len(true_labels):.2f})",
+        label=f"Baseline (positive proportion = {sum(true_labels)/len(true_labels):.2f})",
     )
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel("召回率 (Recall)")
-    plt.ylabel("精确率 (Precision)")
-    plt.title("精确率-召回率曲线")
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("Precision-Recall Curve")
     plt.legend(loc="lower left")
 
     plt.tight_layout()
@@ -1002,7 +1002,7 @@ def plot_binary_metrics(true_labels, predicted_probs):
 
 
 # ----------------------------------------
-# 第6部分: 可视化和解释工具
+# Part 6: Visualization and Explanation Tools
 # ----------------------------------------
 
 
@@ -1017,30 +1017,30 @@ def visualize_sample(
     save_path=None,
 ):
     """
-    可视化时间序列样本及其图像转换
+    Visualize time series sample and its image transformation
 
-    参数:
-    time_series (numpy.ndarray): 原始时间序列数据
-    transformed_image (numpy.ndarray): 转换后的图像
-    prediction (str, optional): 模型预测
-    true_label (str, optional): 真实标签
-    prob (float, optional): 预测概率
-    all_features (numpy.ndarray, optional): 所有特征
-    index (int, optional): 样本索引
-    save_path (str, optional): 保存路径
+    Parameters:
+    time_series (numpy.ndarray): Original time series data
+    transformed_image (numpy.ndarray): Transformed image
+    prediction (str, optional): Model prediction
+    true_label (str, optional): True label
+    prob (float, optional): Prediction probability
+    all_features (numpy.ndarray, optional): All features
+    index (int, optional): Sample index
+    save_path (str, optional): Save path
     """
-    # 创建大型图表
+    # Create large figure
     fig = plt.figure(figsize=(18, 12))
     gs = gridspec.GridSpec(3, 3, height_ratios=[1, 1, 1])
 
-    # 时间序列 - 只显示收盘价
+    # Time series - only show close price
     ax0 = plt.subplot(gs[0, :])
     ax0.plot(time_series, label="Close Price")
     ax0.set_title("Price Time Series", fontsize=15)
     ax0.legend()
     ax0.grid(True)
 
-    # 如果是二元分类，添加颜色条以指示预测
+    # If binary classification, add color bar to indicate prediction
     if prediction is not None and true_label is not None:
         if prediction == "up":
             color = "green" if prediction == true_label else "darkred"
@@ -1049,26 +1049,26 @@ def visualize_sample(
 
         ax0.axhspan(min(time_series), max(time_series), alpha=0.2, color=color)
 
-    # 添加多特征可视化（如果提供）
+    # Add multi-feature visualization (if provided)
     if all_features is not None:
         n_timesteps, n_features = all_features.shape
         if n_features > 1:
             ax1 = plt.subplot(gs[1, 0])
-            # 显示技术指标
-            for i in range(1, min(5, n_features)):  # 最多显示4个其他特征
+            # Show technical indicators
+            for i in range(1, min(5, n_features)):  # Show up to 4 other features
                 ax1.plot(all_features[:, i], label=f"Feature {i}")
             ax1.set_title("Technical Indicators", fontsize=12)
             ax1.legend(loc="upper right")
             ax1.grid(True)
 
-            # 图像表示从第二个位置开始
+            # Image representations start from second column
             start_col = 1
         else:
             start_col = 0
     else:
         start_col = 0
 
-    # 四种图像表示
+    # Four image representations
     titles = ["GASF", "GADF", "Recurrence Plot", "MTF"]
     cmaps = ["viridis", "plasma", "binary", "hot"]
 
@@ -1080,16 +1080,16 @@ def visualize_sample(
         ax.set_title(titles[i], fontsize=12)
         plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
-    # 添加预测和真实标签信息
+    # Add prediction and true label information
     if prediction is not None or true_label is not None or index is not None:
         info_text = ""
         if index is not None:
-            info_text += f"样本索引: {index}\n"
+            info_text += f"Sample Index: {index}\n"
         if true_label is not None:
-            info_text += f"真实标签: {true_label}\n"
+            info_text += f"True Label: {true_label}\n"
         if prediction is not None:
-            prob_str = f" (概率: {prob:.2f})" if prob is not None else ""
-            info_text += f"预测结果: {prediction}{prob_str}"
+            prob_str = f" (Probability: {prob:.2f})" if prob is not None else ""
+            info_text += f"Prediction: {prediction}{prob_str}"
 
         fig.text(
             0.5,
@@ -1102,7 +1102,7 @@ def visualize_sample(
 
     plt.tight_layout()
 
-    # 保存图像
+    # Save image
     if save_path:
         plt.savefig(save_path, bbox_inches="tight")
 
@@ -1111,14 +1111,14 @@ def visualize_sample(
 
 def visualize_training_history(history):
     """
-    可视化训练历史
+    Visualize training history
 
-    参数:
-    history (dict): 训练历史字典
+    args:
+    history (dict): Training history
     """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
 
-    # 准确率
+    # Accuracies
     ax1.plot(history["train_acc"], label="Train")
     ax1.plot(history["val_acc"], label="Validation")
     ax1.set_title("Model Accuracy")
@@ -1127,7 +1127,7 @@ def visualize_training_history(history):
     ax1.legend(loc="lower right")
     ax1.grid(True)
 
-    # 损失
+    # Losses
     ax2.plot(history["train_loss"], label="Train")
     ax2.plot(history["val_loss"], label="Validation")
     ax2.set_title("Model Loss")
@@ -1143,25 +1143,25 @@ def visualize_training_history(history):
 
 def plot_predictions_over_time(predictions, true_labels, probs, indices):
     """
-    绘制预测随时间变化的图表
+    Plot predictions over time
 
-    参数:
-    predictions (numpy.ndarray): 预测类别 (0/1)
-    true_labels (numpy.ndarray): 真实类别 (0/1)
-    probs (numpy.ndarray): 预测概率
-    indices (numpy.ndarray): 时间索引
+    Parameters:
+    predictions (numpy.ndarray): Predicted classes (0/1)
+    true_labels (numpy.ndarray): True classes (0/1)
+    probs (numpy.ndarray): Predicted probabilities
+    indices (numpy.ndarray): Time indices
     """
     plt.figure(figsize=(15, 8))
 
-    # 将二元标签转换为1和-1，用于绘图
+    # Convert binary labels to 1 and -1 for plotting
     plot_true = np.where(true_labels == 1, 1, -1)
 
-    # 绘制预测概率
+    # Plot predicted probabilities
     plt.subplot(2, 1, 1)
-    plt.plot(indices, probs, "b-", alpha=0.7, label="预测概率")
-    plt.axhline(y=0.5, color="gray", linestyle="--", label="决策阈值")
+    plt.plot(indices, probs, "b-", alpha=0.7, label="Predicted Probability")
+    plt.axhline(y=0.5, color="gray", linestyle="--", label="Decision Threshold")
 
-    # 标记错误预测
+    # Mark incorrect predictions
     incorrect = predictions != true_labels
     plt.scatter(
         indices[incorrect],
@@ -1169,21 +1169,21 @@ def plot_predictions_over_time(predictions, true_labels, probs, indices):
         color="red",
         marker="x",
         s=50,
-        label="错误预测",
+        label="Incorrect Predictions",
     )
 
-    plt.title("预测概率随时间变化")
-    plt.ylabel("上涨概率")
+    plt.title("Predicted Probability Over Time")
+    plt.ylabel("Up Probability")
     plt.legend()
     plt.grid(True)
 
-    # 绘制真实标签和预测
+    # Plot true labels and predictions
     plt.subplot(2, 1, 2)
     plt.scatter(
-        indices, plot_true, color="blue", marker="o", alpha=0.7, label="真实标签"
+        indices, plot_true, color="blue", marker="o", alpha=0.7, label="True Labels"
     )
 
-    # 使用不同颜色标记正确和错误预测
+    # Use different colors to mark correct and incorrect predictions
     correct = ~incorrect
     plt.scatter(
         indices[correct],
@@ -1192,7 +1192,7 @@ def plot_predictions_over_time(predictions, true_labels, probs, indices):
         marker="o",
         s=100,
         alpha=0.5,
-        label="正确预测",
+        label="Correct Predictions",
     )
     plt.scatter(
         indices[incorrect],
@@ -1200,12 +1200,12 @@ def plot_predictions_over_time(predictions, true_labels, probs, indices):
         color="red",
         marker="x",
         s=100,
-        label="错误预测",
+        label="Incorrect Predictions",
     )
 
-    plt.title("真实标签和预测随时间变化")
-    plt.ylabel("标签 (1=上涨, -1=下跌)")
-    plt.yticks([-1, 1], ["下跌", "上涨"])
+    plt.title("True Labels and Predictions Over Time")
+    plt.ylabel("Label (1=Up, -1=Down)")
+    plt.yticks([-1, 1], ["Down", "Up"])
     plt.legend()
     plt.grid(True)
 
@@ -1215,7 +1215,7 @@ def plot_predictions_over_time(predictions, true_labels, probs, indices):
 
 
 # ----------------------------------------
-# 第7部分: 执行流程
+# Part 7: Pipeline Execution
 # ----------------------------------------
 
 
@@ -1236,28 +1236,28 @@ def run_atlas_binary_pipeline(
     enable_auto_tuning=False,
 ):
     """
-    运行ATLAS二元分类流程
+    Run the ATLAS binary classification pipeline
 
-    参数:
-    ticker_list (list): 要处理的股票代码列表
-    data_dir (str): 数据目录
-    window_size (int): 时间窗口大小
-    stride (int): 窗口步长
-    image_size (int): 生成图像大小
-    use_specialized_kernels (bool): 是否使用专业卷积核
-    epochs (int): 训练轮数
-    batch_size (int): 批次大小
-    learning_rate (float): 学习率
-    patience (int): 早停耐心值
-    validation_size (float): 验证集比例
-    gap_size (int): 训练和测试集间隔
-    threshold (float): 价格变动阈值，用于标签生成
-    enable_auto_tuning (bool): 是否启用自动调参（类似nnUNet）
+    Parameters:
+    ticker_list (list): List of stock tickers to process
+    data_dir (str): Data directory
+    window_size (int): Window size
+    stride (int): Window stride
+    image_size (int): Image size
+    use_specialized_kernels (bool): Whether to use specialized convolutional kernels
+    epochs (int): Number of training epochs
+    batch_size (int): Batch size
+    learning_rate (float): Learning rate
+    patience (int): Early stopping patience
+    validation_size (float): Validation set proportion
+    gap_size (int): Gap between training and test sets
+    threshold (float): Price change threshold for label generation
+    enable_auto_tuning (bool): Whether to enable automatic hyperparameter tuning (nnUNet-like)
 
-    返回:
-    tuple: (训练好的模型, 测试数据)
+    Returns:
+    tuple: (Trained model, Test data)
     """
-    # 确保输出目录存在
+    # Ensure output directories exist
     os.makedirs("models", exist_ok=True)
     os.makedirs("results", exist_ok=True)
 
@@ -1303,7 +1303,7 @@ def run_atlas_binary_pipeline(
     else:
         print("📋 Using manual parameters (auto-tuning disabled)")
 
-    # 步骤1: 加载和处理数据
+    # Step 1: Data Preprocessing
     all_windows = []
     all_labels = []
     all_indices = []
@@ -1326,12 +1326,12 @@ def run_atlas_binary_pipeline(
     ]
 
     for ticker in ticker_list:
-        print(f"\n处理股票: {ticker}")
+        print(f"\nProcessing stock: {ticker}")
         try:
-            # 加载预处理的数据
+            # Load preprocessed data
             stock_data = load_ticker_data(ticker, data_dir=data_dir)
 
-            # 提取窗口和标签
+            # Extract windows and labels
             windows, labels, indices = extract_windows_with_stride(
                 stock_data,
                 window_size=window_size,
@@ -1343,30 +1343,30 @@ def run_atlas_binary_pipeline(
             all_labels.extend(labels)
             all_indices.extend(indices)
 
-            print(f"从 {ticker} 提取的窗口数: {len(windows)}")
+            print(f"Extracted window count from {ticker}: {len(windows)}")
 
         except Exception as e:
-            print(f"处理 {ticker} 时出错: {str(e)}")
+            print(f"Error processing {ticker}: {str(e)}")
 
     all_windows = np.array(all_windows)
     all_labels = np.array(all_labels)
     all_indices = np.array(all_indices)
 
-    print(f"\n总窗口数: {len(all_windows)}")
-    print(f"窗口形状: {all_windows.shape}")
+    print(f"\nTotal window count: {len(all_windows)}")
+    print(f"Window shape: {all_windows.shape}")
 
-    # 创建标签编码器
+    # Create label encoder
     label_encoder = LabelEncoder()
     numeric_labels = label_encoder.fit_transform(all_labels)
     class_names = label_encoder.classes_
-    print(f"类别映射: {dict(zip(class_names, range(len(class_names))))}")
+    print(f"Class mapping: {dict(zip(class_names, range(len(class_names))))}")
 
-    # 步骤2: 将时间序列转换为图像表示
-    print("\n将时间序列转换为图像...")
+    # Step 2: Convert time series to image representation
+    print("\nConverting time series to image...")
     transformed_images = transform_3d_to_images(all_windows, image_size=image_size)
 
-    # 步骤3: 按时间顺序分割训练集和测试集
-    print("\n分割训练集和测试集...")
+    # Step 3: Split into training and test sets by time
+    print("\nSplitting into training and test sets...")
     X_train, X_test, y_train, y_test, train_indices, test_indices = time_series_split(
         transformed_images,
         all_indices,
@@ -1375,7 +1375,7 @@ def run_atlas_binary_pipeline(
         gap_size=gap_size,
     )
 
-    # 进一步将训练集分为训练和验证
+    # Split training set further into training and validation
     train_size = int((1 - validation_size) * len(X_train))
     val_size = len(X_train) - train_size
 
@@ -1384,17 +1384,17 @@ def run_atlas_binary_pipeline(
     X_train = X_train[:train_size]
     y_train = y_train[:train_size]
 
-    print(f"最终训练集大小: {X_train.shape}")
-    print(f"验证集大小: {X_val.shape}")
-    print(f"测试集大小: {X_test.shape}")
+    print(f"Final training set size: {X_train.shape}")
+    print(f"Validation set size: {X_val.shape}")
+    print(f"Test set size: {X_test.shape}")
 
-    # 步骤4: 准备PyTorch数据集和加载器
-    # PyTorch需要调整通道维度顺序 (B, H, W, C) -> (B, C, H, W)
+    # Step 4: Prepare PyTorch dataset and loader
+    # PyTorch requires adjusting channel dimension order (B, H, W, C) -> (B, C, H, W)
     X_train = np.transpose(X_train, (0, 3, 1, 2))
     X_val = np.transpose(X_val, (0, 3, 1, 2))
     X_test = np.transpose(X_test, (0, 3, 1, 2))
 
-    # 转换为PyTorch张量
+    # Convert to PyTorch tensors
     X_train_tensor = torch.FloatTensor(X_train)
     y_train_tensor = torch.LongTensor(y_train)
     X_val_tensor = torch.FloatTensor(X_val)
@@ -1402,7 +1402,7 @@ def run_atlas_binary_pipeline(
     X_test_tensor = torch.FloatTensor(X_test)
     y_test_tensor = torch.LongTensor(y_test)
 
-    # 创建数据集和加载器
+    # Create dataset and loader
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
     val_dataset = TensorDataset(X_val_tensor, y_val_tensor)
     test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
@@ -1411,38 +1411,38 @@ def run_atlas_binary_pipeline(
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
-    # 步骤5: 创建和训练模型
+    # Step 5: Create and train model
     kernels = create_specialized_kernels() if use_specialized_kernels else None
 
-    # 获取输入形状
+    # Get input shape
     input_shape = (
         transformed_images.shape[1],
         transformed_images.shape[2],
         transformed_images.shape[3],
     )
-    print(f"模型输入形状: {input_shape}")
+    print(f"Model input shape: {input_shape}")
 
     model = ATLASModel(input_shape=input_shape, kernels=kernels, dropout_rate=0.5).to(
         device
     )
 
-    # 打印模型结构
-    print("\n模型结构:")
+    # Print model structure
+    print("\nModel structure:")
     total_params = sum(p.numel() for p in model.parameters())
-    print(f"总参数数量: {total_params:,}")
+    print(f"Total parameters: {total_params:,}")
 
-    # 计算类别权重以处理不平衡问题
+    # Calculate class weights to handle imbalance
     counts = np.bincount(y_train)
     class_weight = 1.0 / counts
     class_weight = class_weight / np.sum(class_weight)
 
-    print(f"类别权重: {class_weight}")
+    print(f"Class weights: {class_weight}")
 
-    # 对于二元分类，使用BCE损失
+    # For binary classification, use BCE loss
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # 学习率调度
+    # Learning rate scheduler
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode="min",
@@ -1450,8 +1450,8 @@ def run_atlas_binary_pipeline(
         patience=5,
     )
 
-    # 训练模型
-    print("\n开始训练模型...")
+    # Train model
+    print("\nTraining model...")
     history = train_model(
         model,
         train_loader,
@@ -1464,51 +1464,51 @@ def run_atlas_binary_pipeline(
         patience=patience,
     )
 
-    # 可视化训练历史
+    # Visualize training history
     visualize_training_history(history)
 
-    # 步骤6: 加载最佳模型并评估
-    print("\n加载最佳模型进行评估...")
+    # Step 6: Load best model and evaluate
+    print("\nLoading best model for evaluation...")
     model.load_state_dict(torch.load("models/atlas_binary_model_best.pth"))
 
     test_loss, test_acc, test_probs, test_labels = evaluate_binary_model(
         model, test_loader, criterion, device
     )
 
-    # 将概率转换为预测类别
+    # Convert probabilities to predicted labels
     test_preds = (test_probs > 0.5).astype(int)
 
-    # 绘制预测随时间变化的图表
+    # Plot predictions over time
     plot_predictions_over_time(test_preds, test_labels, test_probs, test_indices)
 
-    # 步骤7: 可视化一些预测样本
-    print("\n可视化一些预测样本...")
-    # 选择一些典型样本 (正确和错误的预测)
+    # Step 7: Visualize some predictions
+    print("\nVisualizing some predictions...")
+    # Select some typical samples (correct and incorrect predictions)
     correct_mask = test_preds == test_labels
     incorrect_mask = ~correct_mask
 
-    # 取一些正确预测的样本
+    # Take some correct predictions
     n_correct = min(3, np.sum(correct_mask))
     if n_correct > 0:
         correct_indices = np.where(correct_mask)[0][:n_correct]
 
         for idx_in_test in correct_indices:
-            # 转回原始通道顺序 (C, H, W) -> (H, W, C)
+            # Convert back to original channel order (C, H, W) -> (H, W, C)
             sample_image = X_test[idx_in_test].transpose(1, 2, 0)
             sample_window_idx = test_indices[idx_in_test]
 
-            # 获取原始窗口数据
+            # Get original window data
             original_idx = np.where(all_indices == sample_window_idx)[0][0]
             sample_window = all_windows[original_idx]
 
-            # 获取标签和预测
+            # Get label and prediction
             pred = "up" if test_preds[idx_in_test] == 1 else "down"
             true = "up" if test_labels[idx_in_test] == 1 else "down"
             prob = test_probs[idx_in_test]
 
-            # 可视化
+            # Visualize
             visualize_sample(
-                sample_window[:, 0],  # 收盘价
+                sample_window[:, 0],  # Close price
                 sample_image,
                 prediction=pred,
                 true_label=true,
@@ -1518,28 +1518,28 @@ def run_atlas_binary_pipeline(
                 save_path=f"results/binary_correct_prediction_{idx_in_test}.png",
             )
 
-    # 取一些错误预测的样本
+    # Take some incorrect predictions
     n_incorrect = min(3, np.sum(incorrect_mask))
     if n_incorrect > 0:
         incorrect_indices = np.where(incorrect_mask)[0][:n_incorrect]
 
         for idx_in_test in incorrect_indices:
-            # 转回原始通道顺序
+            # Convert back to original channel order
             sample_image = X_test[idx_in_test].transpose(1, 2, 0)
             sample_window_idx = test_indices[idx_in_test]
 
-            # 获取原始窗口数据
+            # Get original window data
             original_idx = np.where(all_indices == sample_window_idx)[0][0]
             sample_window = all_windows[original_idx]
 
-            # 获取标签和预测
+            # Get label and prediction
             pred = "up" if test_preds[idx_in_test] == 1 else "down"
             true = "up" if test_labels[idx_in_test] == 1 else "down"
             prob = test_probs[idx_in_test]
 
-            # 可视化
+            # Visualize
             visualize_sample(
-                sample_window[:, 0],  # 收盘价
+                sample_window[:, 0],  # Close price
                 sample_image,
                 prediction=pred,
                 true_label=true,
@@ -1549,7 +1549,7 @@ def run_atlas_binary_pipeline(
                 save_path=f"results/binary_incorrect_prediction_{idx_in_test}.png",
             )
 
-    # 保存模型及相关信息
+    # Save model and related information
     model_info = {
         "class_names": class_names,
         "input_shape": input_shape,
@@ -1604,11 +1604,11 @@ def demo_auto_tuning():
 
 def main():
     """
-    主函数
+    Main function
     """
     print("=" * 50)
     print("ATLAS: Advanced Technical Learning Analysis System")
-    print("股票市场技术二元分类系统")
+    print("Stock Market Pattern Recognition (Binary Classification)")
     print("=" * 50)
 
     # 股票列表
@@ -1726,28 +1726,28 @@ def main():
     ]
     # ticker_list = ['000001.SS', 'AAPL', 'ABBV', 'ABT', 'ADBE', 'AIG', 'ALB', 'ALL', 'AMAT', 'AMD', 'AMGN', 'AMT', 'AMZN', 'APA', 'APD', 'ARE', 'ARKK', 'AVB', 'AXP', 'BA', 'BABA', 'BAC', 'BIDU', 'BIIB', 'BILI', 'BK', 'BKR', 'BLK', 'BMY', 'BXP', 'C', 'CAT', 'CCI', 'CE', 'CF', 'CI', 'CL', 'CMCSA', 'CMI', 'COF', 'COP', 'COST', 'CRM', 'CSCO', 'CVS', 'CVX', 'DD', 'DE', 'DHR', 'DIA', 'DIS', 'DLR', 'DOW', 'DVN', 'ECL', 'EEM', 'EL', 'EMN', 'EMR', 'EOG', 'EP', 'EQIX', 'EQR', 'ESS', 'ETN', 'FANG', 'FCX', 'FDX', 'FMC', 'GD', 'GDX', 'GE', 'GILD', 'GIS', 'GOOGL', 'GOTU', 'GS', 'HAL', 'HD', 'HES', 'HON', 'HST', 'HUM', 'HYG', 'IBM', 'IEMG', 'IFF', 'INTC', 'IQ', 'IR', 'ISRG', 'IVV', 'IWM', 'JD', 'JNJ', 'JPM', 'K', 'KIM', 'KMB', 'KMI', 'KO', 'LI', 'LIN', 'LLY', 'LMT', 'LOW', 'MA', 'MAA', 'MCD', 'MET', 'META', 'MLM', 'MMM', 'MOS', 'MPC', 'MRK', 'MRO', 'MS', 'MSFT', 'MU', 'NEM', 'NFLX', 'NIO', 'NKE', 'NOW', 'NSC', 'NUE', 'NVDA', 'O', 'ORCL', 'OXY', 'PDD', 'PEP', 'PFE', 'PG', 'PH', 'PLD', 'PNC', 'PPG', 'PRU', 'PSA', 'PSX', 'QCOM', 'QQQ', 'REG', 'REGN', 'ROK', 'RTX', 'SBUX', 'SCHW', 'SEE', 'SHW', 'SLB', 'SNOW', 'SPG', 'SPY', 'T', 'TFC', 'TGT', 'TLT', 'TME', 'TMO', 'TSLA', 'UDR', 'UNH', 'UNP', 'UPS', 'USB', 'USO', 'V', 'VLO', 'VMC', 'VNQ', 'VOO', 'VRTX', 'VTI', 'VTR', 'VZ', 'WELL', 'WFC', 'WM', 'WMB', 'WMT', 'XLE', 'XLF', 'XLK', 'XLP', 'XLY', 'XOM', 'XPEV', 'ZTS', '^DJI', '^FTSE', '^GDAXI', '^GSPC', '^HSI', '^IXIC', '^NDX', '^RUT', '^VIX']
 
-    # 运行完整流程
-    print("\n🎆 Demo: ATLAS with Auto-Tuning (nnUNet-style)")
-    print("📝 Set enable_auto_tuning=True to use data-driven parameter optimization")
+    # Run full pipeline with auto-tuning enabled
+    print("\n Demo: ATLAS with Auto-Tuning (nnUNet-style)")
+    print(" Note: Set enable_auto_tuning=True to use data-driven parameter optimization")
     
     model, test_data = run_atlas_binary_pipeline(
         ticker_list=ticker_list,
-        data_dir="data",  # 数据目录
-        window_size=50,  # 时间窗口大小
-        stride=10,  # 步长，减少窗口重叠
-        image_size=50,  # 图像尺寸
+        data_dir="data",  # Data directory
+        window_size=50,  # Window size
+        stride=10,  # Stride, reduce window overlap
+        image_size=50,  # Image size
         use_specialized_kernels=True,
         epochs=50,
         batch_size=32,
         learning_rate=0.001,
-        patience=15,  # 早停耐心值
+        patience=15,  # Early stopping patience
         validation_size=0.2,
-        gap_size=20,  # 训练和测试集间隔
-        threshold=0.5,  # 标签生成阈值
-        enable_auto_tuning=True,  # 🎆 Enable nnUNet-like auto-tuning!
+        gap_size=20,  # Gap between training and testing sets
+        threshold=0.5,  # Label generation threshold
+        enable_auto_tuning=True,  # Enable nnUNet-like auto-tuning!
     )
 
-    print("\n完成!")
+    print("\nDone!")
 
 
 if __name__ == "__main__":
