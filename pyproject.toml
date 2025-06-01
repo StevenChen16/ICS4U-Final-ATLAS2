@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "atlas-stock-analysis"
+version = "0.1.0"
+description = "AI-Powered Stock Market Pattern Recognition using Knowledge-Distilled CNN"
+readme = "README.md"
+authors = [
+    { name = "Steven Chen", email = "i@stevenchen.site" }
+]
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "flake8"]
+gpu = ["GPUtil>=1.4.0"]
+
+[project.scripts]
+atlas = "main:main"

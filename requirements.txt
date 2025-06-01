@@ -1,14 +1,21 @@
-dash
-torch
-torchvision
-scikit-learn
-scikit-image
-yfinance
-dash-bootstrap-components
-pyts
-matplotlib
-seaborn
-tqdm
+numpy>=1.21.0,<2.0.0
+pandas>=1.3.0
+torch>=2.1.0
+torchvision>=0.16.0
+scikit-learn>=1.0.0
+scikit-image>=0.18.0
+yfinance>=0.1.70
+pyts>=0.12.0
+matplotlib>=3.4.0
+seaborn>=0.11.0
+tqdm>=4.62.0
+joblib>=1.1.0
+TA-Lib>=0.4.25
+
+# for dashboard
+dash>=2.0.0
+dash-bootstrap-components>=1.0.0
+plotly>=5.0.0
 
 # for test
-GPUtil
+GPUtil>=1.4.0
