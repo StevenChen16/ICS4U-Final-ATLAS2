@@ -85,3 +85,5 @@ tmp/
 # model weights
 *.pth
 *.pt
+*.pkl
+*.h5
