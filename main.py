@@ -59,24 +59,83 @@ def run_data_preparation():
         return False
     return True
 
-def run_training():
-    """Run model training"""
-    print("\nStarting ATLAS model training...")
-    print("Note: Training may take 10-30 minutes depending on hardware")
+def run_training(disable_auto_tuning=False):
+    """
+    Run model training with optional auto-tuning
     
-    confirm = input("Continue with training? (y/N): ").lower().strip()
+    Args:
+        disable_auto_tuning (bool): If True, disable nnUNet-style auto-parameter tuning
+    """
+    print("\nStarting ATLAS model training...")
+    
+    # Check for available data directories
+    if os.path.exists("data_short"):
+        data_dir = "data_short"
+    elif os.path.exists("data"):
+        data_dir = "data"
+    else:
+        print("❌ No data directory found! Please run 'python main.py --data' first.")
+        return
+    
+    # Use a reasonable default ticker list
+    ticker_list = [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA",
+        "NVDA", "META", "AMD", "INTC", "CRM"
+    ]
+    
+    print(f"\n📊 Training Configuration:")
+    print(f"   📁 Data directory: {data_dir}/")
+    print(f"   📈 Training stocks: {len(ticker_list)} tickers")
+    print(f"   🎯 Stocks: {', '.join(ticker_list)}")
+    
+    if not disable_auto_tuning:
+        print(f"   🎆 Auto-Tuning: Enabled (nnUNet-style)")
+        print(f"      • Automatic parameter optimization based on data characteristics")
+        print(f"      • No manual hyperparameter tuning required")
+        print(f"      • Adaptive to different market conditions and data sizes")
+    else:
+        print(f"   📋 Auto-Tuning: Disabled")
+        print(f"      • Using predefined hyperparameters")
+        print(f"      • Expert-level parameter tuning required for optimal results")
+    
+    print(f"   ⏱️ Estimated time: 10-30 minutes depending on hardware")
+    
+    confirm = input("\nContinue with training? (y/N): ").lower().strip()
     if confirm not in ['y', 'yes']:
         print("Training cancelled")
         return
     
     try:
-        from src.atlas2 import main as atlas_main
-        atlas_main()
-        print("Model training completed successfully!")
-        print("Model saved to models/ directory")
-        print("Training results saved to results/ directory")
+        # Import and run training pipeline
+        from src.atlas2 import run_atlas_binary_pipeline
+        
+        print(f"\n🚀 Starting training pipeline...")
+        
+        model, test_data = run_atlas_binary_pipeline(
+            ticker_list=ticker_list,
+            data_dir=data_dir,
+            epochs=30,  # Reasonable for demo
+            enable_auto_tuning=not disable_auto_tuning,  # 🎆 Key feature!
+        )
+        
+        print("\n🎉 Model training completed successfully!")
+        print("   📁 Model saved to models/ directory")
+        print("   📊 Training results saved to results/ directory")
+        
+        if not disable_auto_tuning:
+            print("\n✨ Auto-tuning optimization completed!")
+            print("   ⚙️ Configuration automatically adapted to your data characteristics")
+        else:
+            print("\n📋 Manual configuration training completed!")
+            print("   💡 Consider enabling auto-tuning next time: --train (without --no-auto-tuning)")
+            
     except Exception as e:
-        print(f"Training failed: {e}")
+        print(f"❌ Training failed: {e}")
+        print("\n🔧 Troubleshooting suggestions:")
+        print("   1. Check data file integrity with 'python main.py --demo'")
+        print("   2. Ensure sufficient disk space (>1GB free)")
+        print("   3. Verify GPU/CPU resources")
+        print("   4. Try manual mode: 'python main.py --train --no-auto-tuning'")
         sys.exit(1)
 
 def run_dashboard():
@@ -174,7 +233,8 @@ Example Usage:
         """
     )
     
-    parser.add_argument("--train", action="store_true", help="Train ATLAS model")
+    parser.add_argument("--train", action="store_true", help="Train ATLAS model with optional auto-tuning (nnUNet-style)")
+    parser.add_argument("--no-auto-tuning", action="store_true", help="Disable automatic parameter optimization (use predefined parameters)")
     parser.add_argument("--dashboard", action="store_true", help="Start real-time dashboard")
     parser.add_argument("--demo", action="store_true", help="Run system demo")
     parser.add_argument("--test", action="store_true", help="Run performance benchmark")
@@ -187,7 +247,7 @@ Example Usage:
     
     # Execute based on arguments
     if args.train:
-        run_training()
+        run_training(disable_auto_tuning=args.no_auto_tuning)
     elif args.dashboard:
         run_dashboard()
     elif args.demo:
@@ -208,7 +268,13 @@ Example Usage:
                     print("Thank you for using ATLAS!")
                     break
                 elif choice == '1':
-                    run_training()
+                    # Ask about auto-tuning in interactive mode
+                    print("\n🤖 Training Mode Selection:")
+                    print("  1. Auto-Tuning Mode (Recommended) - nnUNet-style parameter optimization")
+                    print("  2. Manual Mode - Use predefined parameters")
+                    mode_choice = input("Select training mode (1/2): ").strip()
+                    disable_auto = mode_choice == '2'
+                    run_training(disable_auto_tuning=disable_auto)
                 elif choice == '2':
                     run_dashboard()
                 elif choice == '3':
