@@ -80,7 +80,7 @@ tmp/
 *.csv
 
 # docs
-*.pdf
+ICS4U+++Final+Project+Ideas.pdf
 
 # model weights
 *.pth
