@@ -453,30 +453,60 @@ class ATLASInferenceEngine:
             # 1. Price trend chart
             ax1 = axes[0, 0]
             recent_data = data.tail(100)  # Show recent 100 days
-            ax1.plot(recent_data.index, recent_data['Close'], 'b-', linewidth=2, label='Close Price')
+            
+            # Create continuous x-axis indices for proper alignment
+            x_indices = range(len(recent_data))
+            
+            ax1.plot(x_indices, recent_data['Close'], 'b-', linewidth=2, label='Close Price')
             
             if 'MA5' in recent_data.columns:
-                ax1.plot(recent_data.index, recent_data['MA5'], 'orange', alpha=0.7, label='MA5')
+                ax1.plot(x_indices, recent_data['MA5'], 'orange', alpha=0.7, label='MA5')
             if 'MA20' in recent_data.columns:
-                ax1.plot(recent_data.index, recent_data['MA20'], 'red', alpha=0.7, label='MA20')
+                ax1.plot(x_indices, recent_data['MA20'], 'red', alpha=0.7, label='MA20')
                 
-            # Mark prediction window
-            window_start = len(recent_data) - self.model_info['window_size']
-            if window_start >= 0:
-                ax1.axvspan(window_start, len(recent_data), alpha=0.2, 
+            # Mark prediction window - now aligned with the actual x-axis
+            window_size = self.model_info['window_size']
+            if len(recent_data) >= window_size:
+                window_start = len(recent_data) - window_size
+                window_end = len(recent_data)
+                ax1.axvspan(window_start, window_end, alpha=0.3, 
                            color='green' if result['prediction'] == 'up' else 'red',
-                           label='Prediction Window')
+                           label=f'Prediction Window ({window_size} days)')
+                
+            # Set x-axis labels to show dates if available
+            if 'Date' in recent_data.columns:
+                # Show every 10th date to avoid overcrowding
+                step = max(1, len(recent_data)//10)
+                date_indices = range(0, len(recent_data), step)
+                date_labels = []
+                for i in date_indices:
+                    if i < len(recent_data):
+                        date_val = recent_data.iloc[i]['Date']
+                        if isinstance(date_val, str):
+                            # If it's already a string, truncate to show just date
+                            date_labels.append(date_val[:10] if len(date_val) > 10 else date_val)
+                        else:
+                            # If it's a datetime object, format it
+                            date_labels.append(date_val.strftime('%Y-%m-%d'))
+                    else:
+                        date_labels.append('')
+                        
+                ax1.set_xticks(date_indices)
+                ax1.set_xticklabels(date_labels, rotation=45, ha='right')
+            else:
+                ax1.set_xlabel('Days (Recent)')
                 
             ax1.set_title('Price Trend and Prediction Window')
             ax1.set_xlabel('Time')
-            ax1.set_ylabel('Price')
-            ax1.legend()
+            ax1.set_ylabel('Price ($)')
+            ax1.legend(loc='upper left')
             ax1.grid(True, alpha=0.3)
             
             # 2. Technical indicators
             ax2 = axes[0, 1]
             if 'RSI' in data.columns:
-                ax2.plot(recent_data.index, recent_data['RSI'], 'purple', label='RSI')
+                recent_rsi = recent_data['RSI']
+                ax2.plot(x_indices, recent_rsi, 'purple', label='RSI')
                 ax2.axhline(y=70, color='r', linestyle='--', alpha=0.7, label='Overbought')
                 ax2.axhline(y=30, color='g', linestyle='--', alpha=0.7, label='Oversold')
                 ax2.set_ylim(0, 100)

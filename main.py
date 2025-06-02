@@ -151,6 +151,10 @@ def run_dashboard():
     except Exception as e:
         print(f"Dashboard startup failed: {e}")
 
+def run_inference():
+    from src.inference import main as inference_main
+    inference_main()
+
 def run_demo():
     """Run system demo"""
     print("\nATLAS System Demo")
@@ -239,6 +243,7 @@ Example Usage:
     parser.add_argument("--demo", action="store_true", help="Run system demo")
     parser.add_argument("--test", action="store_true", help="Run performance benchmark")
     parser.add_argument("--data", action="store_true", help="Download and prepare data")
+    parser.add_argument("--inference", action="store_true", help="Run inference")
     
     args = parser.parse_args()
     
@@ -256,6 +261,8 @@ Example Usage:
         run_performance_test()
     elif args.data:
         run_data_preparation()
+    elif args.inference:
+        run_inference()
     else:
         # Show interactive menu if no arguments
         print_menu()
