@@ -81,7 +81,7 @@ python inference.py --batch AAPL,MSFT,GOOGL,TSLA
 
 ## 🏗️ System Architecture
 
-![ATLAS Architecture](docs/figures/visualize_atlas.pdf)
+<iframe src="docs/figures/visualize_atlas.pdf" width="100%" height="700px"></iframe>
 *Figure 1: ATLAS CNN Architecture - Four parallel branches processing GASF, GADF, RP, and MTF image representations*
 
 ### Multi-Modal Time Series to Image Pipeline
