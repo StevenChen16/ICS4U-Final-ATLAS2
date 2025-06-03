@@ -82,6 +82,11 @@ tmp/
 # docs
 ICS4U+++Final+Project+Ideas.pdf
 docs/paper
+Design+Plan.txt
+ICS4U_project2025.pdf
+ICS4U+Python+Final+Culminating+Project.pdf
+reflections.txt
+Software+Plan.txt
 
 # model weights
 *.pth
