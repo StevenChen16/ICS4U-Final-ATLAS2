@@ -42,11 +42,13 @@ def print_menu():
     print("  3. Run Demo                 (python main.py --demo)")
     print("  4. Performance Test         (python main.py --test)")
     print("  5. Prepare Data             (python main.py --data)")
-    print("  6. Show Help                (python main.py --help)")
+    print("  6. Run Inference            (python main.py --inference)")
+    print("  7. Show Help                (python main.py --help)")
     print("\nQuick Start:")
     print("  New Users: python main.py --demo")
     print("  Researchers: python main.py --train")
     print("  Traders: python main.py --dashboard")
+    print("  Predictions: python main.py --inference")
 
 def run_data_preparation():
     """Run data preparation"""
@@ -153,8 +155,59 @@ def run_dashboard():
         print(f"Dashboard startup failed: {e}")
 
 def run_inference():
-    from src.inference import main as inference_main
-    inference_main()
+    """Run inference module"""
+    print("\nStarting ATLAS inference system...")
+    print("This will launch the interactive stock prediction interface.")
+    print("You can predict individual stocks, batch process multiple stocks,")
+    print("or analyze data from CSV files.")
+    
+    try:
+        # 直接导入 ATLASInferenceEngine 而不是调用 main
+        from src.inference import ATLASInferenceEngine
+        
+        # 初始化推理引擎
+        engine = ATLASInferenceEngine()
+        
+        # 交互式模式
+        print("\n🎯 Interactive Prediction Mode")
+        print("Please select prediction method:")
+        print("1. Single stock prediction")
+        print("2. Batch prediction") 
+        print("3. File prediction")
+        
+        choice = input("\nPlease enter choice (1-3): ").strip()
+        
+        if choice == "1":
+            ticker = input("Please enter stock ticker: ").strip().upper()
+            start_date = input("Please enter start date (default 2023-01-01): ").strip() or "2023-01-01"
+            result = engine.predict_single_ticker(ticker, start_date=start_date)
+            
+        elif choice == "2":
+            tickers_input = input("Please enter stock tickers (comma separated): ").strip()
+            ticker_list = [t.strip().upper() for t in tickers_input.split(',')]
+            start_date = input("Please enter start date (default 2023-01-01): ").strip() or "2023-01-01"
+            result = engine.predict_batch(ticker_list, start_date=start_date)
+            
+        elif choice == "3":
+            file_path = input("Please enter CSV file path: ").strip()
+            result = engine.predict_from_file(file_path)
+            
+        else:
+            print("❌ Invalid choice")
+            return False
+            
+        print(f"\n✅ Prediction completed!")
+        print("\n💡 Disclaimer: This prediction is for reference only and does not constitute investment advice.")
+        
+    except ImportError as e:
+        print(f"❌ Failed to import inference module: {e}")
+        print("Please ensure inference.py is in the src/ directory")
+        return False
+    except Exception as e:
+        print(f"❌ Inference failed: {e}")
+        return False
+    
+    return True
 
 def run_demo():
     """Run system demo"""
@@ -270,7 +323,7 @@ Example Usage:
         
         while True:
             try:
-                choice = input("\nSelect option (1-6, or 'q' to quit): ").strip().lower()
+                choice = input("\nSelect option (1-7, or 'q' to quit): ").strip().lower()
                 
                 if choice in ['q', 'quit', 'exit']:
                     print("Thank you for using ATLAS!")
@@ -292,6 +345,8 @@ Example Usage:
                 elif choice == '5':
                     run_data_preparation()
                 elif choice == '6':
+                    run_inference()
+                elif choice == '7':
                     parser.print_help()
                 else:
                     print("Invalid choice. Please enter 1-6 or 'q'")
