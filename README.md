@@ -79,6 +79,46 @@ python inference.py --batch AAPL,MSFT,GOOGL,TSLA
 
 ---
 
+## 📊 Dataset
+
+### Getting Data for ATLAS
+
+You have two options to obtain data for training and testing:
+
+#### Option 1: Use Pre-processed Dataset (Recommended for Quick Start)
+Download our curated US stock market dataset from Kaggle:
+- **Dataset**: [US Stock Collect Data](https://www.kaggle.com/datasets/stevenchen116/us-stock-collect-data)
+- **Contents**: Pre-processed data for 200+ stocks with technical indicators
+- **Time Period**: 2020-2024 (4+ years of historical data)
+- **Features**: 14 technical indicators including RSI, MACD, Bollinger Bands, Kalman filters, etc.
+
+```bash
+# Download and extract to your ATLAS directory
+# The dataset should be placed in 'data/' folder
+```
+
+#### Option 2: Generate Custom Dataset
+Run the data collection script to customize your ticker list and time period:
+
+```bash
+# Generate fresh data with custom parameters
+python main.py --data
+
+# Or customize in src/data.py:
+# - Modify ticker lists
+# - Adjust time periods  
+# - Add custom technical indicators
+python -c "from src.data import main; main()"
+```
+
+**Custom Data Advantages:**
+- Choose your own stock universe
+- Adjust time periods for different market conditions
+- Add custom technical indicators
+- Always get the latest market data
+
+---
+
 ## 🏗️ System Architecture
 
 ![ATLAS Architecture](docs/figures/visualize_atlas.png)
@@ -250,6 +290,7 @@ ATLAS/
 | **H100 (80GB)** | **0.261 TFlops** | **29,269 samples/sec** | **0.94 ms** | Ultra-HFT trading |
 | V100 (32GB) | 0.182 TFlops | 20,415 samples/sec | 1.53 ms | Enterprise deployment |
 | RTX 4060 Laptop | 0.044 TFlops | 8,362 samples/sec | 3.32 ms | Consumer development |
+| **P100 (Kaggle)** | 0.111 TFlops | 12,505 samples/sec | 2.23 ms | Research and development |
 | Ascend 910B | 0.064 TFlops | 7,200 samples/sec | 4.07 ms | Chinese ecosystem |
 
 ---
@@ -340,17 +381,26 @@ result = engine.predict_single_ticker("AAPL")
 - **TA-Lib**: Technical analysis indicator computation
 - **PyTS**: Time series to image transformation library
 
+### Key Research References
+
+#### nnU-Net (Medical AI Auto-Configuration)
+- Isensee, F., Jaeger, P. F., Kohl, S. A., Petersen, J., & Maier-Hein, K. H. (2021). **nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation**. *Nature Methods*, 18(2), 203-211. [[Nature Methods](https://www.nature.com/articles/s41592-020-01008-z)] [[arXiv](https://arxiv.org/abs/1904.08128)]
+
+#### Knowledge Distillation
+- Hinton, G., Vinyals, O., & Dean, J. (2015). **Distilling the knowledge in a neural network**. *arXiv preprint arXiv:1503.02531*. [[arXiv](https://arxiv.org/abs/1503.02531)]
+
+#### Time Series to Image Transformation
+- Wang, Z., & Oates, T. (2015). **Encoding time series as images for visual inspection and classification using tiled convolutional neural networks**. *Workshops at the Twenty-Ninth AAAI Conference on Artificial Intelligence*. [[Paper](https://www.aaai.org/ocs/index.php/WS/AAAIW15/paper/view/10179)]
+
+#### Attention Mechanisms
+- Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). **Attention is all you need**. *Advances in neural information processing systems*, 5998-6008. [[arXiv](https://arxiv.org/abs/1706.03762)] [[NIPS](https://papers.nips.cc/paper/7181-attention-is-all-you-need)]
+
 ### Financial & Mathematical Concepts
 - **Technical Analysis**: Chart patterns and indicator systems
 - **Quantitative Finance**: Mathematical models for trading
 - **Signal Processing**: Kalman filtering and FFT analysis
 - **Market Microstructure**: High-frequency trading considerations
 - **Risk Management**: Portfolio theory and exposure control
-
-### Research Inspiration
-- **nnU-Net**: "nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation" - *Nature Methods*
-- **Knowledge Distillation**: Hinton et al. - "Distilling the Knowledge in a Neural Network"
-- **Time Series Imaging**: Wang & Oates - "Encoding Time Series as Images for Visual Inspection and Classification"
 
 ---
 
@@ -404,8 +454,8 @@ This project is for educational purposes as part of the ICS4U Computer Science c
 
 #### Complete Performance Matrix
 
-| Metric | **H100 (80GB)** | **V100 (32GB)** | **Kaggle GPU** | **Ascend 910B** | **RTX 4060 Laptop** | **CPU (Ryzen 7 7840H)** |
-|--------|------------------|------------------|-----------------|------------------|---------------------|-------------------------|
+| Metric | **H100 (80GB)** | **V100 (32GB)** | **P100 (Kaggle)** | **Ascend 910B** | **RTX 4060 Laptop** | **CPU (Ryzen 7 7840H)** |
+|--------|------------------|------------------|---------------------|------------------|---------------------|-------------------------|
 | **Validation Accuracy** | **83.4%** | **83.4%** | **83.4%** | **83.4%** | **83.4%** | **83.4%** |
 | **Model Parameters** | **17,081** | **17,081** | **17,081** | **17,081** | **17,081** | **17,081** |
 | **Model Size** | **0.07 MB** | **0.07 MB** | **0.07 MB** | **0.07 MB** | **0.07 MB** | **0.07 MB** |
@@ -416,7 +466,7 @@ This project is for educational purposes as part of the ICS4U Computer Science c
 | **Optimal Batch Size** | **32 (TFlops) / 8 (balanced)** | **32 / 8** | **32 / 8** | **32 / 8** | **32 / 8** | **32 / 8** |
 | **Torch.Compile Speedup** | **1.01x** | **0.97x** | **0.98x** | **0.98x** | **N/A** | **0.95x** |
 | **Batch Scaling** | **27.4x (BS1→BS32)** | **31.8x** | **27.9x** | **29.3x** | **38.8x** | **6.6x** |
-| **Hardware Type** | **Next-Gen Data Center** | **Data Center GPU** | **Cloud GPU** | **AI Accelerator** | **Consumer GPU** | **Consumer CPU** |
+| **Hardware Type** | **Next-Gen Data Center** | **Data Center GPU** | **Research/Kaggle** | **AI Accelerator** | **Consumer GPU** | **Consumer CPU** |
 
 #### Cross-Platform Analysis
 
