@@ -14,6 +14,7 @@ Usage:
     python main.py --demo            # Run demo
     python main.py --test           # Run performance test
     python main.py --data           # Prepare data
+    python main.py --inference      # Run inference
 """
 
 import argparse

@@ -81,6 +81,7 @@ tmp/
 
 # docs
 ICS4U+++Final+Project+Ideas.pdf
+docs/paper
 
 # model weights
 *.pth
