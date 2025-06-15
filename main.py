@@ -186,58 +186,43 @@ def run_moe_training(disable_auto_tuning=False):
     
     print(f"   ⏱️ Estimated time: 15-45 minutes depending on hardware")
     
-    confirm = input("\nContinue with MoE training? (y/N): ").lower().strip()
-    if confirm not in ['y', 'yes']:
-        print("Training cancelled")
-        return
+    # Import and run MoE training pipeline
+    from src.atlas_moe_pipeline import run_atlas_moe_pipeline
     
-    try:
-        # Import and run MoE training pipeline
-        from src.atlas_moe_pipeline import run_atlas_moe_pipeline
+    print(f"\n🚀 Starting MoE training pipeline...")
+    
+    model, test_data, history = run_atlas_moe_pipeline(
+        ticker_list=ticker_list,
+        data_dir=data_dir,
+        epochs=30,  # Reasonable for demo
+        enable_auto_tuning=not disable_auto_tuning,
+        enable_moe=True,
+        use_learnable_gate=True,
+        top_k=2,
+        load_balance_weight=0.01
+    )
+    
+    print("\n🎉 MoE model training completed successfully!")
+    print("   📁 Model saved to models/ directory")
+    print("   📊 Training results saved to results/ directory")
+    print("   🧠 Expert routing information included")
+    
+    # Show expert utilization summary
+    _, _, _, _, routing_info = test_data
+    if routing_info:
+        print("\n📈 Expert Utilization Summary:")
+        expert_names = ['crypto_hft', 'equity_intraday', 'equity_daily', 'futures_trend', 'low_vol_etf']
+        avg_utilization = sum([info['expert_utilization'] for info in routing_info]) / len(routing_info)
         
-        print(f"\n🚀 Starting MoE training pipeline...")
-        
-        model, test_data, history = run_atlas_moe_pipeline(
-            ticker_list=ticker_list,
-            data_dir=data_dir,
-            epochs=30,  # Reasonable for demo
-            enable_auto_tuning=not disable_auto_tuning,
-            enable_moe=True,
-            use_learnable_gate=True,
-            top_k=2,
-            load_balance_weight=0.01
-        )
-        
-        print("\n🎉 MoE model training completed successfully!")
-        print("   📁 Model saved to models/ directory")
-        print("   📊 Training results saved to results/ directory")
-        print("   🧠 Expert routing information included")
-        
-        # Show expert utilization summary
-        _, _, _, _, routing_info = test_data
-        if routing_info:
-            print("\n📈 Expert Utilization Summary:")
-            expert_names = ['crypto_hft', 'equity_intraday', 'equity_daily', 'futures_trend', 'low_vol_etf']
-            avg_utilization = sum([info['expert_utilization'] for info in routing_info]) / len(routing_info)
-            
-            for i, name in enumerate(expert_names):
-                print(f"   {name}: {avg_utilization[i]:.1%}")
-        
-        if not disable_auto_tuning:
-            print("\n✨ Auto-tuning optimization completed!")
-            print("   ⚙️ Configuration automatically adapted for each expert")
-        else:
-            print("\n📋 Manual configuration training completed!")
-            print("   💡 Consider enabling auto-tuning next time for better performance")
-            
-    except Exception as e:
-        print(f"❌ MoE training failed: {e}")
-        print("\n🔧 Troubleshooting suggestions:")
-        print("   1. Check data file integrity with 'python main.py --demo'")
-        print("   2. Ensure sufficient disk space (>2GB free for MoE)")
-        print("   3. Verify GPU/CPU resources (MoE requires more memory)")
-        print("   4. Try regular training first: 'python main.py --train'")
-        sys.exit(1)
+        for i, name in enumerate(expert_names):
+            print(f"   {name}: {avg_utilization[i]:.1%}")
+    
+    if not disable_auto_tuning:
+        print("\n✨ Auto-tuning optimization completed!")
+        print("   ⚙️ Configuration automatically adapted for each expert")
+    else:
+        print("\n📋 Manual configuration training completed!")
+        print("   💡 Consider enabling auto-tuning next time for better performance")
 
 def run_dashboard():
     """Start dashboard"""
