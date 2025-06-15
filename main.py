@@ -38,15 +38,17 @@ def print_menu():
     """Print main menu"""
     print("\nAvailable Commands:")
     print("  1. Train AI Model           (python main.py --train)")
-    print("  2. Start Dashboard          (python main.py --dashboard)")
-    print("  3. Run Demo                 (python main.py --demo)")
-    print("  4. Performance Test         (python main.py --test)")
-    print("  5. Prepare Data             (python main.py --data)")
-    print("  6. Run Inference            (python main.py --inference)")
-    print("  7. Show Help                (python main.py --help)")
+    print("  2. Train MoE Model          (python main.py --train-moe)")
+    print("  3. Start Dashboard          (python main.py --dashboard)")
+    print("  4. Run Demo                 (python main.py --demo)")
+    print("  5. Performance Test         (python main.py --test)")
+    print("  6. Prepare Data             (python main.py --data)")
+    print("  7. Run Inference            (python main.py --inference)")
+    print("  8. Show Help                (python main.py --help)")
     print("\nQuick Start:")
     print("  New Users: python main.py --demo")
     print("  Researchers: python main.py --train")
+    print("  MoE Research: python main.py --train-moe")
     print("  Traders: python main.py --dashboard")
     print("  Predictions: python main.py --inference")
 
@@ -139,6 +141,102 @@ def run_training(disable_auto_tuning=False):
         print("   2. Ensure sufficient disk space (>1GB free)")
         print("   3. Verify GPU/CPU resources")
         print("   4. Try manual mode: 'python main.py --train --no-auto-tuning'")
+        sys.exit(1)
+
+def run_moe_training(disable_auto_tuning=False):
+    """
+    Run MoE model training with expert routing
+    
+    Args:
+        disable_auto_tuning (bool): If True, disable nnUNet-style auto-parameter tuning
+    """
+    print("\nStarting ATLAS MoE model training...")
+    print("🧠 Mixture-of-Experts (MoE) enables adaptive expert routing based on market characteristics")
+    
+    # Check for available data directories
+    if os.path.exists("data_short"):
+        data_dir = "data_short"
+    elif os.path.exists("data"):
+        data_dir = "data"
+    else:
+        print("❌ No data directory found! Please run 'python main.py --data' first.")
+        return
+    
+    # Use a reasonable default ticker list
+    ticker_list = [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA",
+        "NVDA", "META", "AMD", "INTC", "CRM",
+        "JPM", "BAC", "BABA", "BTC-USD", "ETH-USD"  # More diverse for MoE
+    ]
+    
+    print(f"\n📊 MoE Training Configuration:")
+    print(f"   📁 Data directory: {data_dir}/")
+    print(f"   📈 Training stocks: {len(ticker_list)} tickers")
+    print(f"   🎯 Stocks: {', '.join(ticker_list[:10])}{'...' if len(ticker_list) > 10 else ''}")
+    print(f"   🧠 Experts: crypto_hft, equity_intraday, equity_daily, futures_trend, low_vol_etf")
+    print(f"   🔀 Top-K routing: 2 experts per sample")
+    
+    if not disable_auto_tuning:
+        print(f"   🎆 Auto-Tuning: Enabled (nnUNet-style)")
+        print(f"      • Automatic parameter optimization for each expert")
+        print(f"      • Data-driven expert selection and routing")
+    else:
+        print(f"   📋 Auto-Tuning: Disabled")
+        print(f"      • Using predefined hyperparameters")
+    
+    print(f"   ⏱️ Estimated time: 15-45 minutes depending on hardware")
+    
+    confirm = input("\nContinue with MoE training? (y/N): ").lower().strip()
+    if confirm not in ['y', 'yes']:
+        print("Training cancelled")
+        return
+    
+    try:
+        # Import and run MoE training pipeline
+        from src.atlas_moe_pipeline import run_atlas_moe_pipeline
+        
+        print(f"\n🚀 Starting MoE training pipeline...")
+        
+        model, test_data, history = run_atlas_moe_pipeline(
+            ticker_list=ticker_list,
+            data_dir=data_dir,
+            epochs=30,  # Reasonable for demo
+            enable_auto_tuning=not disable_auto_tuning,
+            enable_moe=True,
+            use_learnable_gate=True,
+            top_k=2,
+            load_balance_weight=0.01
+        )
+        
+        print("\n🎉 MoE model training completed successfully!")
+        print("   📁 Model saved to models/ directory")
+        print("   📊 Training results saved to results/ directory")
+        print("   🧠 Expert routing information included")
+        
+        # Show expert utilization summary
+        _, _, _, _, routing_info = test_data
+        if routing_info:
+            print("\n📈 Expert Utilization Summary:")
+            expert_names = ['crypto_hft', 'equity_intraday', 'equity_daily', 'futures_trend', 'low_vol_etf']
+            avg_utilization = sum([info['expert_utilization'] for info in routing_info]) / len(routing_info)
+            
+            for i, name in enumerate(expert_names):
+                print(f"   {name}: {avg_utilization[i]:.1%}")
+        
+        if not disable_auto_tuning:
+            print("\n✨ Auto-tuning optimization completed!")
+            print("   ⚙️ Configuration automatically adapted for each expert")
+        else:
+            print("\n📋 Manual configuration training completed!")
+            print("   💡 Consider enabling auto-tuning next time for better performance")
+            
+    except Exception as e:
+        print(f"❌ MoE training failed: {e}")
+        print("\n🔧 Troubleshooting suggestions:")
+        print("   1. Check data file integrity with 'python main.py --demo'")
+        print("   2. Ensure sufficient disk space (>2GB free for MoE)")
+        print("   3. Verify GPU/CPU resources (MoE requires more memory)")
+        print("   4. Try regular training first: 'python main.py --train'")
         sys.exit(1)
 
 def run_dashboard():
@@ -284,6 +382,7 @@ def main():
 Example Usage:
   python main.py                    # Show interactive menu
   python main.py --train           # Train model
+  python main.py --train-moe       # Train MoE model
   python main.py --dashboard       # Start dashboard
   python main.py --demo            # Run demo
   python main.py --test           # Performance test
@@ -292,6 +391,7 @@ Example Usage:
     )
     
     parser.add_argument("--train", action="store_true", help="Train ATLAS model with optional auto-tuning (nnUNet-style)")
+    parser.add_argument("--train-moe", action="store_true", help="Train ATLAS MoE model with expert routing")
     parser.add_argument("--no-auto-tuning", action="store_true", help="Disable automatic parameter optimization (use predefined parameters)")
     parser.add_argument("--dashboard", action="store_true", help="Start real-time dashboard")
     parser.add_argument("--demo", action="store_true", help="Run system demo")
@@ -307,6 +407,8 @@ Example Usage:
     # Execute based on arguments
     if args.train:
         run_training(disable_auto_tuning=args.no_auto_tuning)
+    elif args.train_moe:
+        run_moe_training(disable_auto_tuning=args.no_auto_tuning)
     elif args.dashboard:
         run_dashboard()
     elif args.demo:
@@ -323,7 +425,7 @@ Example Usage:
         
         while True:
             try:
-                choice = input("\nSelect option (1-7, or 'q' to quit): ").strip().lower()
+                choice = input("\nSelect option (1-8, or 'q' to quit): ").strip().lower()
                 
                 if choice in ['q', 'quit', 'exit']:
                     print("Thank you for using ATLAS!")
@@ -337,19 +439,27 @@ Example Usage:
                     disable_auto = mode_choice == '2'
                     run_training(disable_auto_tuning=disable_auto)
                 elif choice == '2':
-                    run_dashboard()
+                    # Ask about auto-tuning for MoE
+                    print("\n🧠 MoE Training Mode Selection:")
+                    print("  1. Auto-Tuning Mode (Recommended) - Expert-specific parameter optimization")
+                    print("  2. Manual Mode - Use predefined parameters")
+                    mode_choice = input("Select MoE training mode (1/2): ").strip()
+                    disable_auto = mode_choice == '2'
+                    run_moe_training(disable_auto_tuning=disable_auto)
                 elif choice == '3':
-                    run_demo()
+                    run_dashboard()
                 elif choice == '4':
-                    run_performance_test()
+                    run_demo()
                 elif choice == '5':
-                    run_data_preparation()
+                    run_performance_test()
                 elif choice == '6':
-                    run_inference()
+                    run_data_preparation()
                 elif choice == '7':
+                    run_inference()
+                elif choice == '8':
                     parser.print_help()
                 else:
-                    print("Invalid choice. Please enter 1-6 or 'q'")
+                    print("Invalid choice. Please enter 1-8 or 'q'")
                     
             except KeyboardInterrupt:
                 print("\n\nThank you for using ATLAS!")
