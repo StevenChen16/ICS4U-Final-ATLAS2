@@ -168,7 +168,8 @@ def run_moe_training(disable_auto_tuning=False):
         "NVDA", "META", "AMD", "INTC", "CRM",
         "JPM", "BAC", "BABA", 
         'BNB-USD', 'BTC-USD', 'DOGE-USD', 'ETH-USD', 'LINK-USD', 'LTC-USD', 'XRP-USD', 
-        'EURGBP', 'EURUSD', 'GBPUSD', 'USDCHF', 'USDCNY', 'USDJPY'
+        'EURGBP', 'EURUSD', 'GBPUSD', 'USDCHF', 'USDCNY', 'USDJPY',
+        'processed_000001_XSHE'
     ]
     
     print(f"\n📊 MoE Training Configuration:")
