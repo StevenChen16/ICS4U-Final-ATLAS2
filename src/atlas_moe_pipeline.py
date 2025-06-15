@@ -515,7 +515,7 @@ def run_atlas_moe_pipeline(
     
     # Load best model and evaluate
     print("\n📊 Evaluating best model...")
-    checkpoint = torch.load("models/atlas_moe_model_best.pth")
+    checkpoint = torch.load("models/atlas_moe_model_best.pth", weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     
     test_loss, test_acc, test_probs, test_labels, routing_info = evaluate_moe_model(

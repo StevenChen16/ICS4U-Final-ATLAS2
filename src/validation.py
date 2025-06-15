@@ -152,7 +152,7 @@ class ATLASValidator:
             dropout_rate=0.0
         ).to(self.device)
         
-        self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
+        self.model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=False))
         self.model.eval()
         
         print(f"✅ Model loaded successfully!")

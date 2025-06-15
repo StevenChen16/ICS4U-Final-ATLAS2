@@ -100,23 +100,19 @@ class ExpertBranch(nn.Module):
             # Use standard convolution
             self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=3, padding=1)
         
-        # Shared components
-        self.bn1 = nn.BatchNorm2d(self.conv1.out_channels)
+        # Shared components (remove BatchNorm to avoid single-batch issues)
         self.relu = nn.ReLU()
         self.pool = nn.MaxPool2d(2)
         self.conv2 = nn.Conv2d(self.conv1.out_channels, 32, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(32)
         self.attention = AttentionBlock(32)
         self.dropout = nn.Dropout2d(dropout_rate)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv1(x)
-        x = self.bn1(x)
         x = self.relu(x)
         x = self.pool(x)
         
         x = self.conv2(x)
-        x = self.bn2(x)
         x = self.relu(x)
         x = self.attention(x)
         x = self.dropout(x)
@@ -241,15 +237,13 @@ class AtlasMoEModel(nn.Module):
             )
             self.feature_dim = self.single_expert.feature_dim
         
-        # Shared classifier
+        # Shared classifier  
         if config.share_classifier:
             self.classifier = nn.Sequential(
                 nn.Linear(self.feature_dim, 64),
-                nn.BatchNorm1d(64),
                 nn.ReLU(),
                 nn.Dropout(config.dropout_rate),
                 nn.Linear(64, 32),
-                nn.BatchNorm1d(32),
                 nn.ReLU(),
                 nn.Dropout(config.dropout_rate / 2),
                 nn.Linear(32, 1),

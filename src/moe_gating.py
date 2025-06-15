@@ -273,21 +273,44 @@ class MoEGatingSystem(nn.Module):
                 df = pd.DataFrame(df_dict)
                 
                 try:
-                    # Extract fingerprint
-                    fingerprint = fingerprinter.extract_fingerprint(df)
-                    
-                    # Convert to tensor features
-                    feature_vector = [
-                        fingerprint.get('vol30', 0.0),
-                        fingerprint.get('trend_r2', 0.0),
-                        fingerprint.get('hurst', 0.5),
-                        fingerprint.get('spread_estimate', 0.0),
-                        fingerprint.get('volume_z', 0.0),
-                        fingerprint.get('atr_pct', 0.0),
-                        fingerprint.get('skewness', 0.0),
-                        fingerprint.get('kurtosis', 0.0),
-                        fingerprint.get('momentum_10', 0.0)
-                    ]
+                    # Check if we have enough data points
+                    if len(df) < 30:
+                        # Use simplified features for small datasets
+                        close_prices = df['Close'].values
+                        if len(close_prices) > 1:
+                            volatility = np.std(np.diff(close_prices) / close_prices[:-1])
+                            trend = (close_prices[-1] - close_prices[0]) / close_prices[0]
+                        else:
+                            volatility = 0.0
+                            trend = 0.0
+                        
+                        feature_vector = [
+                            volatility * 252**0.5,  # Annualized vol
+                            abs(trend),  # Trend strength
+                            0.5,  # Default hurst
+                            0.001,  # Default spread
+                            0.0,  # Volume z-score
+                            volatility,  # ATR proxy
+                            0.0,  # Default skewness
+                            3.0,  # Default kurtosis
+                            trend   # Momentum proxy
+                        ]
+                    else:
+                        # Extract full fingerprint
+                        fingerprint = fingerprinter.extract_fingerprint(df)
+                        
+                        # Convert to tensor features
+                        feature_vector = [
+                            fingerprint.get('vol30', 0.0),
+                            fingerprint.get('trend_r2', 0.0),
+                            fingerprint.get('hurst', 0.5),
+                            fingerprint.get('spread_estimate', 0.0),
+                            fingerprint.get('volume_z', 0.0),
+                            fingerprint.get('atr_pct', 0.0),
+                            fingerprint.get('skewness', 0.0),
+                            fingerprint.get('kurtosis', 0.0),
+                            fingerprint.get('momentum_10', 0.0)
+                        ]
                     
                     fingerprint_features[i] = torch.tensor(feature_vector, device=device)
                     

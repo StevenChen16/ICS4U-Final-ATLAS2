@@ -1469,7 +1469,7 @@ def run_atlas_binary_pipeline(
 
     # Step 6: Load best model and evaluate
     print("\nLoading best model for evaluation...")
-    model.load_state_dict(torch.load("models/atlas_binary_model_best.pth"))
+    model.load_state_dict(torch.load("models/atlas_binary_model_best.pth", weights_only=False))
 
     test_loss, test_acc, test_probs, test_labels = evaluate_binary_model(
         model, test_loader, criterion, device
