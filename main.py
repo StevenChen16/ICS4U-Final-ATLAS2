@@ -166,7 +166,9 @@ def run_moe_training(disable_auto_tuning=False):
     ticker_list = [
         "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA",
         "NVDA", "META", "AMD", "INTC", "CRM",
-        "JPM", "BAC", "BABA", "BTC-USD", "ETH-USD"  # More diverse for MoE
+        "JPM", "BAC", "BABA", 
+        'BNB-USD', 'BTC-USD', 'DOGE-USD', 'ETH-USD', 'LINK-USD', 'LTC-USD', 'XRP-USD', 
+        'EURGBP', 'EURUSD', 'GBPUSD', 'USDCHF', 'USDCNY', 'USDJPY'
     ]
     
     print(f"\n📊 MoE Training Configuration:")
