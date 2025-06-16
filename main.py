@@ -169,7 +169,7 @@ def run_moe_training(disable_auto_tuning=False):
         "JPM", "BAC", "BABA", 
         'BNB-USD', 'BTC-USD', 'DOGE-USD', 'ETH-USD', 'LINK-USD', 'LTC-USD', 'XRP-USD', 
         'EURGBP', 'EURUSD', 'GBPUSD', 'USDCHF', 'USDCNY', 'USDJPY',
-        'processed_000001_XSHE'
+        'processed_000001_XSHE_short', 'processed_000002_XSHE_short', 'processed_000004_XSHE_short', 'processed_000005_XSHE_short'
     ]
     
     print(f"\n📊 MoE Training Configuration:")
