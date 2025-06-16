@@ -5,7 +5,7 @@ Main Entry Point
 
 Author: Steven Chen
 Course: ICS4U Computer Science
-Date: May 2025
+Date: June 2025
 
 Usage:
     python main.py                    # Show menu
