@@ -15,6 +15,27 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 
+# --------- Sparsemax 实现 ---------
+def _sparsemax(logits: torch.Tensor, dim: int = -1) -> torch.Tensor:
+    """
+    PyTorch-native sparsemax (Martins & Astudillo, 2016).
+    Returns a **sparse** probability simplex like Softmax → but with hard zeros.
+    """
+    original_size = logits.size()
+    logits = logits.transpose(dim, -1)          # [..., d] → [..., d] with dim=-1
+    logits = logits.reshape(-1, logits.size(-1))
+
+    z_sorted, _ = torch.sort(logits, descending=True, dim=-1)
+    k = torch.arange(1, z_sorted.size(1)+1, device=logits.device).float()
+    z_cumsum = torch.cumsum(z_sorted, dim=-1)
+    k_mask = (1 + k * z_sorted) > z_cumsum
+    k_max = k_mask.float().argmax(dim=-1) + 1
+    # τ = (Σ z_i − 1) / k
+    tau = (z_cumsum[torch.arange(z_cumsum.size(0)), k_max-1] - 1) / k_max
+    out = torch.clamp(logits - tau.unsqueeze(-1), min=0.0)
+    out = out.reshape(original_size).transpose(dim, -1)
+    return out
+
 from .data_fingerprint import DataFingerprinter, classify_market_archetype, get_expert_weights
 
 
@@ -29,6 +50,12 @@ class GatingConfig:
     noise_std: float = 0.1
     expert_capacity_factor: float = 1.25
     use_rule_based_warmstart: bool = True
+    # ---- 新增超参 ----
+    temperature_start: float = 2.0        # 退火起始温度
+    temperature_end:   float = 0.5        # 退火终止温度
+    temperature_decay: float = 5e-4       # 每 step 乘以 (1-decay)
+    use_sparsemax:     bool  = False      # True → sparsemax；False → softmax / gumbel
+    use_gumbel_hard:   bool  = False      # True → Hard Gumbel-Top-1 (训练期)
 
 
 class RuleBasedGate(nn.Module):
@@ -102,8 +129,9 @@ class LearnableGate(nn.Module):
             nn.Linear(config.intermediate_dim, config.num_experts)
         )
         
-        # Noise for exploration
+        # Exploration & 退火温度
         self.noise_std = config.noise_std
+        self.register_buffer("temperature", torch.tensor(config.temperature_start))
         
     def forward(self, fingerprint_features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -126,8 +154,24 @@ class LearnableGate(nn.Module):
             noise = torch.randn_like(logits) * self.noise_std
             logits = logits + noise
         
-        # Softmax to get probabilities
-        gates = F.softmax(logits, dim=-1)
+        # ------ 温度退火 ------
+        # 训练阶段按 decay 指数退火；推理保持最低温度
+        if self.training:
+            self.temperature = torch.clamp(
+                self.temperature * (1.0 - self.config.temperature_decay),
+                min=self.config.temperature_end
+            )
+        logits = logits / self.temperature
+        
+        # ------ 概率映射：Softmax / Sparsemax / Gumbel ------
+        if self.config.use_gumbel_hard and self.training:
+            # 可微 Gumbel-Softmax；hard=False 留连续概率给 Top-k
+            gates = F.gumbel_softmax(logits, tau=self.temperature.item(),
+                                     hard=False, dim=-1)
+        elif self.config.use_sparsemax:
+            gates = _sparsemax(logits, dim=-1)
+        else:
+            gates = F.softmax(logits, dim=-1)
         
         # Calculate load balancing loss
         load_balance_loss = self._calculate_load_balance_loss(gates)
@@ -383,7 +427,12 @@ class MoEGatingSystem(nn.Module):
 def create_moe_gating_system(
     use_learnable: bool = True,
     top_k: int = 2,
-    load_balance_weight: float = 0.01
+    load_balance_weight: float = 0.01,
+    use_sparsemax: bool = False,
+    use_gumbel_hard: bool = False,
+    temperature_start: float = 2.0,
+    temperature_end: float = 0.5,
+    temperature_decay: float = 5e-4
 ) -> MoEGatingSystem:
     """Create MoE gating system with standard configuration"""
     config = GatingConfig(
@@ -394,7 +443,12 @@ def create_moe_gating_system(
         load_balance_weight=load_balance_weight,
         noise_std=0.1,
         expert_capacity_factor=1.25,
-        use_rule_based_warmstart=True
+        use_rule_based_warmstart=True,
+        temperature_start=temperature_start,
+        temperature_end=temperature_end,
+        temperature_decay=temperature_decay,
+        use_sparsemax=use_sparsemax,
+        use_gumbel_hard=use_gumbel_hard
     )
     
     return MoEGatingSystem(config, use_learnable_gate=use_learnable)
