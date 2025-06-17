@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "atlas-stock-analysis"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI-Powered Stock Market Pattern Recognition using Knowledge-Distilled CNN"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -44,6 +44,18 @@ full = ["atlas-stock-analysis[dev,gpu]"]
 
 [project.scripts]
 atlas = "main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+include = [
+    "main.py",
+    "atlas_explainer.py", 
+    "numerai_atlas_adapter.py",
+    "patch.py",
+    "process_forex_crypto_data.py",
+    "README.md",
+    "LICENSE"
+]
 
 [tool.black]
 line-length = 88
